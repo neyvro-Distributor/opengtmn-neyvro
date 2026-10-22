@@ -21,6 +21,17 @@ def test_tool_catalog_is_unique_and_complete():
     assert all(spec.scopes for spec in remote_mcp.TOOL_SPECS)
 
 
+def test_public_tools_are_separate_from_the_56_backend_specs():
+    server = remote_mcp.build_server()
+    tools = server._tool_manager._tools
+    assert len(remote_mcp.TOOL_SPECS) == 56
+    assert "neyvro_list_skills" in tools
+    assert "neyvro_get_skill" in tools
+    assert set(tools) >= {spec.name for spec in remote_mcp.TOOL_SPECS}
+    assert tools["neyvro_list_skills"].meta["auth"] == "PUBLIC"
+    assert tools["neyvro_get_skill"].meta["read_only"] is True
+
+
 def test_unconfigured_readiness_is_not_verified():
     report = remote_mcp.readiness_report()
 
@@ -40,6 +51,30 @@ def test_anonymous_and_cross_tenant_requests_are_rejected(monkeypatch):
     remote_mcp.AUTH_CLAIMS.set({"tenant_id": "tenant-a"})
     request = remote_mcp.ToolRequest(workspace_id="tenant-b", company_id="company-a")
     assert asyncio.run(remote_mcp.handle_tool(spec, request))["status"] == "forbidden"
+
+
+def test_public_skill_tools_are_anonymous_allowlisted_and_read_only(monkeypatch):
+    monkeypatch.setattr(remote_mcp, "get_access_token", lambda: None)
+    original = (remote_mcp.SKILLS_ROOT / "ideal-customer-profile/SKILL.md").read_text(encoding="utf-8")
+
+    listed = remote_mcp._public_list_skills(limit=100)
+    assert len(listed) == 35
+    assert all("path" not in item for item in listed)
+
+    fetched = remote_mcp._public_get_skill("ideal-customer-profile")
+    assert fetched["name"] == "ideal-customer-profile"
+    assert fetched["content"] == original
+    assert (remote_mcp.SKILLS_ROOT / "ideal-customer-profile/SKILL.md").read_text(encoding="utf-8") == original
+
+    with pytest.raises(ValueError, match="unknown public skill"):
+        remote_mcp._public_get_skill("../ideal-customer-profile")
+
+
+def test_public_skill_rate_limit_is_fail_closed(monkeypatch):
+    monkeypatch.setattr(remote_mcp, "PUBLIC_LIMITER", remote_mcp.RateLimiter(per_minute=1))
+    assert remote_mcp._public_get_skill("ideal-customer-profile")["name"] == "ideal-customer-profile"
+    limited = remote_mcp._public_get_skill("ideal-customer-profile")
+    assert limited["status"] == "rate_limited"
 
 
 def test_missing_scope_and_pending_approval_are_enforced(monkeypatch):

@@ -41,6 +41,8 @@ MAX_PAGE_SIZE = 100
 MAX_BODY_BYTES = 512 * 1024
 SKILLS_ROOT = Path(__file__).resolve().parents[2] / "skills"
 MAX_SKILL_BYTES = 256 * 1024
+MAX_PUBLIC_SKILL_NAME_LENGTH = 128
+MAX_PUBLIC_LIST_LIMIT = 100
 
 
 class ToolMode(StrEnum):
@@ -145,6 +147,11 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
 )
 SPEC_BY_NAME = {spec.name: spec for spec in TOOL_SPECS}
 
+# This is deliberately derived from the canonical repository once at startup.
+# It is an allowlist: callers cannot turn a path, URI, or partial name into a
+# filesystem read.
+PUBLIC_SKILL_NAMES = frozenset(skill.name for skill in discover_skills(SKILLS_ROOT))
+
 
 class BackendDisabled(Exception):
     pass
@@ -216,6 +223,7 @@ class RateLimiter:
 
 BACKEND = BackendClient()
 LIMITER = RateLimiter(int(os.getenv("NEYVRO_MCP_REQUESTS_PER_MINUTE", "60")))
+PUBLIC_LIMITER = RateLimiter(int(os.getenv("NEYVRO_MCP_PUBLIC_REQUESTS_PER_MINUTE", "30")))
 
 
 def _auth_context(spec: ToolSpec, request: ToolRequest) -> tuple[str | None, dict[str, Any]]:
@@ -275,6 +283,63 @@ async def handle_tool(spec: ToolSpec, request: ToolRequest) -> dict[str, Any]:
         return {"status": "invalid_request", "error": {"code": "invalid_request", "message": str(exc)}}
 
 
+def _public_metadata(skill: Any) -> dict[str, Any]:
+    return {
+        "name": skill.name,
+        "description": skill.description,
+        "version": skill.version,
+        "maturity": skill.maturity,
+        "mode": skill.mode,
+        "required_scopes": list(skill.required_scopes),
+        "related_skills": list(skill.related_skills),
+        "resource_uri": f"neyvro://skills/{skill.name}",
+    }
+
+
+def _allow_public_call(tool_name: str) -> dict[str, Any] | None:
+    if not PUBLIC_LIMITER.allow("anonymous", tool_name):
+        return {"status": "rate_limited", "error": {"code": "public_rate_limit_exceeded", "message": "Retry after the public skill rate-limit window."}}
+    return None
+
+
+def _validate_public_name(name: str) -> str:
+    if not isinstance(name, str) or not name.strip() or len(name) > MAX_PUBLIC_SKILL_NAME_LENGTH:
+        raise ValueError("name must be a non-empty skill identifier")
+    normalized = name.strip()
+    if normalized not in PUBLIC_SKILL_NAMES:
+        raise ValueError("unknown public skill")
+    return normalized
+
+
+def _public_list_skills(query: str | None = None, limit: int = MAX_PUBLIC_LIST_LIMIT) -> list[dict[str, Any]]:
+    """List bounded metadata from the canonical public skill allowlist."""
+    limited = _allow_public_call("neyvro_list_skills")
+    if limited:
+        return [limited]
+    if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1 or limit > MAX_PUBLIC_LIST_LIMIT:
+        raise ValueError(f"limit must be between 1 and {MAX_PUBLIC_LIST_LIMIT}")
+    if query is not None and (not isinstance(query, str) or not query.strip() or len(query) > 256):
+        raise ValueError("query must be a non-empty string of at most 256 characters when supplied")
+    skills = discover_skills(SKILLS_ROOT)
+    if query is not None:
+        terms = query.casefold().split()
+        skills = tuple(skill for skill in skills if any(term in (skill.name + " " + skill.description).casefold() for term in terms))
+    return [_public_metadata(skill) for skill in skills if skill.name in PUBLIC_SKILL_NAMES][:limit]
+
+
+def _public_get_skill(name: str) -> dict[str, Any]:
+    """Return one canonical SKILL.md without accepting filesystem paths."""
+    limited = _allow_public_call("neyvro_get_skill")
+    if limited:
+        return limited
+    selected = _validate_public_name(name)
+    skill = load_skill(selected, SKILLS_ROOT)
+    content = skill.markdown
+    if len(content.encode("utf-8")) > MAX_SKILL_BYTES:
+        raise ValueError("skill resource exceeds the bounded resource size")
+    return {**_public_metadata(skill), "content": content}
+
+
 def _tool_handler(spec: ToolSpec) -> Callable[..., Any]:
     async def handler(request: ToolRequest, ctx: Context) -> dict[str, Any]:
         return await handle_tool(spec, request)
@@ -306,6 +371,10 @@ def build_server() -> FastMCP:
     server = FastMCP(**kwargs)
     for spec in TOOL_SPECS:
         server.add_tool(_tool_handler(spec), name=spec.name, description=spec.description, structured_output=True, meta={"readiness": spec.readiness, "mode": spec.mode.value, "required_scopes": list(spec.scopes), "approval_required": spec.approval_required, "backend_path": spec.path})
+    # These two tools intentionally do not call _auth_context and do not have
+    # backend paths. They expose only the canonical public skill library.
+    server.add_tool(_public_list_skills, name="neyvro_list_skills", description="List bounded metadata for the public Neyvro skill library.", structured_output=True, meta={"readiness": "AVAILABLE", "mode": "KNOWLEDGE", "auth": "PUBLIC", "read_only": True})
+    server.add_tool(_public_get_skill, name="neyvro_get_skill", description="Retrieve one exact public Neyvro skill and its canonical SKILL.md content.", structured_output=True, meta={"readiness": "AVAILABLE", "mode": "KNOWLEDGE", "auth": "PUBLIC", "read_only": True})
     _register_public_skill_surfaces(server)
     return server
 
