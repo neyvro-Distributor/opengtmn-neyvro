@@ -1,0 +1,15 @@
+{
+  "skill": "email-deliverability",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "read_only": true,
+  "contracts": [
+    {"name": "neyvro_get_mailbox_health", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]},
+    {"name": "neyvro_get_sender_limits", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]},
+    {"name": "neyvro_get_delivery_metrics", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]},
+    {"name": "neyvro_audit_email_configuration", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]}
+  ],
+  "setup_requirements": ["tenant-scoped Gmail or Microsoft connection", "read-only provider permission", "provider credential reference", "explicit DNS inspection authorization for SPF/DKIM/DMARC checks"],
+  "authorization": "No DNS mutation or email send operation is exposed; external test messages require a separate approved action."
+}

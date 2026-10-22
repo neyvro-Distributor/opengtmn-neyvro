@@ -1,0 +1,14 @@
+{
+  "skill": "outreach-personalization",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "draft_only": true,
+  "contracts": [
+    {"name": "neyvro_get_personalization_context", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]},
+    {"name": "neyvro_generate_personalization", "operation": "draft", "required_scopes": ["intelligence:read", "proposals:write"], "approval_required": true, "output_status": ["draft_ready", "needs_evidence", "blocked", "disabled"]},
+    {"name": "neyvro_validate_outreach_claims", "operation": "validate", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["valid", "flagged", "blocked", "disabled"]},
+    {"name": "neyvro_get_brand_voice", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]}
+  ],
+  "authorization": "Personalization is draft-only. No contract sends, schedules, publishes, or mutates outreach state."
+}

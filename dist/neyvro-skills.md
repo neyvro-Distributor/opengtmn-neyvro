@@ -5,35 +5,104 @@ This generated bundle is for explicit bulk import. Prefer registry discovery and
 
 ---
 
-<!-- account-research/SKILL.md version 0.1.0 -->
+<!-- account-research/SKILL.md version 0.2.0 -->
 
 ---
 name: account-research
-description: Activate when researching a specific company or person before an authorized GTM decision, draft, or investigation.
-version: 0.1.0
-maturity: contract
-mode: research
-required_scopes: ["intelligence:read"]
-related_skills: ["ideal-customer-profile","evidence","outreach-personalization"]
+description: Activate when researching a specific company or authorized buyer for a GTM decision, outreach draft, qualification review, or investigation; use existing Neyvro company-twin evidence before requesting new research.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read"]
+  related_skills: ["ideal-customer-profile", "evidence", "outreach-personalization", "buyer-matching"]
 ---
 
-# account research
+# Account research
 
-Collect relevant, dated, source-attributed company and buyer facts. Research requires Neyvro discovery services and must return evidence IDs, source URLs, observed timestamps, and uncertainty.
+Produce a concise, cited account brief whose purpose is one evidence-backed outreach or GTM angle—not an unbounded dossier. Start with the most recent meaningful change (`why_now`), reuse fresh Neyvro company-twin research, and stop when the account-tier budget is spent.
 
-## Behavior modes
+## Operating modes
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
+- **Knowledge-only:** explain research methods or provide a blank workflow without login, network calls, or claims about a real company.
+- **Connected research:** use only authorized Neyvro read contracts. Prefer the company twin, verified evidence, signals, and timeline; request new research only for missing or stale fields.
+- **Draft-only:** produce the brief and an outreach angle; never send, publish, enrich, or mutate CRM state.
+- **External action:** requires an authenticated tenant scope, provider permission, explicit approval, audit logging, and an idempotency key.
 
-## Contract
+If the requested company is not found, return `not_found` and research gaps. If access is not authorized, return `unauthorized` and do not infer or expose relationship history or private buyer data.
 
-- Activation: Activate when researching a specific company or person before an authorized GTM decision, draft, or investigation.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+## Research workflow
+
+1. Identify the company unambiguously using the authorized company ID or a verified domain. Do not silently merge similarly named companies.
+2. Read the digital twin and existing timeline/evidence first. Treat a field as fresh only when its source-specific observation is inside the configured freshness window; do not repeatedly crawl fresh research.
+3. Research in this order when permitted: business model and positioning; industry and approximate size; technology stack and changes; hiring and leadership; expansion and funding; product developments; public buyer information; authorized relationship history; open questions.
+4. Prefer first-party or directly attributable sources. Attach `evidence_id`, source, observed timestamp, and confidence to every material observation.
+5. Separate the brief into verified observations, reasonable inferences, predictions, unknown facts, and disqualifiers. Contradictory observations remain visible and lower confidence; they are not resolved by averaging or invention.
+6. Select exactly one strongest outreach angle. It must be grounded in at least one recent verified signal plus a relevant product/ICP connection. If no such pair exists, return `angle_status: "not_ready"` instead of fabricating relevance.
+
+## Account-tier budgets
+
+Use the customer-approved tier when available. Otherwise report the missing tier and use the conservative C-tier budget.
+
+| Tier | Maximum research budget | Minimum useful result |
+| --- | ---: | --- |
+| A | 15 minutes / 12 source fetches | one recent trigger, buyer context, and a cited angle |
+| B | 5 minutes / 5 source fetches | one verified trigger or company-specific relevance line |
+| C | 1 minute / 1 source fetch | role/industry/technology relevance only; no 1:1 deep research |
+
+Budgets are limits, not targets. Reuse fresh verified evidence and stop early when the minimum result is met. Never use a personal or irrelevant detail as an outreach angle.
+
+## Evidence rules
+
+- `verified_observations`: directly supported, dated facts from authorized evidence.
+- `inferences`: explicitly labeled conclusions supported by one or more observations.
+- `predictions`: conditional hypotheses about likely priorities or timing; never state them as facts.
+- `unknown_facts`: material fields not found or not fresh enough to rely on.
+- `disqualifiers`: explicit ICP exclusions, access restrictions, contradictory identity, or evidence that makes the requested action unsuitable.
+- A single signal does not qualify an account. Reconcile the account with the ICP and buyer context, and show negative evidence as well as supporting evidence.
+
+## Required output
+
+Return Markdown or JSON with exactly these core fields:
+
+```json
+{
+  "status": "researched|stale|not_found|unauthorized|not_ready",
+  "account_tier": "A|B|C|unknown",
+  "why_this_company": "...",
+  "why_now": "...",
+  "relevant_buyers": [],
+  "supporting_evidence": [],
+  "negative_evidence": [],
+  "verified_observations": [],
+  "inferences": [],
+  "predictions": [],
+  "uncertainty": [],
+  "unknown_facts": [],
+  "disqualifiers": [],
+  "recommended_next_action": "...",
+  "outreach_angle": {"status": "ready|not_ready", "text": "...", "evidence_ids": []},
+  "research_budget": {"minutes": 0, "source_fetches": 0, "used_fetches": 0},
+  "freshness": {"last_researched_at": "...", "stale_fields": []}
+}
+```
+
+`supporting_evidence` and `negative_evidence` must cite evidence IDs or source URLs. Do not manufacture company size, funding, hiring, technology, relationships, testimonials, results, or buyer identities. A recommendation may be a research question when evidence is insufficient.
+
+## MCP integration contracts
+
+Use these contracts only through an authenticated Neyvro adapter and the required `intelligence:read` scope. They are disabled by default when no adapter is configured:
+
+- `neyvro_get_company_twin` — read the current tenant-scoped digital twin and freshness metadata.
+- `neyvro_get_company_signals` — read verified technology, hiring, leadership, funding, expansion, and product signals.
+- `neyvro_get_company_timeline` — read dated historical events without recrawling fresh sources.
+- `neyvro_get_evidence` — retrieve cited evidence, confidence, provenance, and negative evidence.
+- `neyvro_research_company` — request bounded research for missing/stale fields; this is a read/research operation, must honor the tier budget, and must not mutate CRM or send outreach.
+
+The skill never creates a duplicate customer database. It consumes the existing company twin and returns a reviewable brief. Relationship history is included only when the adapter confirms authorization.
+
+See also: `ideal-customer-profile` for fit, `evidence` for provenance, `outreach-personalization` for draft copy, and `buyer-matching` for persona selection.
 
 ---
 
@@ -101,35 +170,80 @@ A trigger is an opportunity to investigate, not evidence that a buyer is ready. 
 
 ---
 
-<!-- cold-email-writing/SKILL.md version 0.1.0 -->
+<!-- cold-email-writing/SKILL.md version 0.2.0 -->
 
 ---
 name: cold-email-writing
-description: Activate when drafting or reviewing a personalized cold email or short sequence from authorized evidence.
-version: 0.1.0
-maturity: contract
-mode: draft
-required_scopes: ["intelligence:read","proposals:write"]
-related_skills: ["account-research","outreach-personalization","email-deliverability"]
+description: Activate when drafting or reviewing an evidence-grounded outbound email from an authorized opportunity, buyer, product, positioning, channel, and tone; this skill never sends messages.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: draft
+  required_scopes: ["intelligence:read", "proposals:write"]
+  related_skills: ["account-research", "outreach-personalization", "email-deliverability", "multichannel-sequences"]
 ---
 
-# cold email writing
+# Cold email writing
 
-Draft mode creates editable, evidence-linked variants with one clear ask. Sending or scheduling is external action requiring an approved proposal, mailbox permission, and idempotency key.
+Create a short, reviewable outbound email with one clear ask. Relevance comes from Neyvro company and buyer evidence; the product message comes only from customer-approved positioning. This skill is draft-only: it must not send, schedule, publish, enroll, or mutate follow-up state.
 
-## Behavior modes
+## Required inputs
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
+Require `opportunity_id`, `buyer_id`, `customer_product`, `approved_positioning`, `channel`, and `tone`. Read the buyer and opportunity through authorized Neyvro services when available. A draft may also receive verified prospect evidence, buyer role/name, company name, framework, and follow-up count. If a required input or evidence source is unavailable, return a flagged draft result rather than inventing it.
 
-## Contract
+## Workflow
 
-- Activation: Activate when drafting or reviewing a personalized cold email or short sequence from authorized evidence.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+1. Confirm the buyer is not suppressed, opted out, an existing customer, or otherwise blocked. A suppressed recipient returns `approval_status: "blocked"` and no sendable body.
+2. Select one relevant, recent, verified company signal. Trigger-first personalization is preferred; otherwise use a role/industry observation. Every concrete prospect claim must carry one or more evidence IDs and source metadata.
+3. Form a business-relevant problem hypothesis as a question or conditional inference. Never state a business problem, funding event, technology migration, relationship, personal familiarity, result, or testimonial without evidence.
+4. Translate only the approved positioning into one buyer-relevant value proposition. Do not add capabilities, metrics, customer names, or outcomes not present in the approved positioning.
+5. Use exactly one framework per draft: PAS (problem–agitate–solution), BAB (before–after–bridge), AIDA (attention–interest–desire–action), or trigger-first. Keep the email short and plain-text friendly.
+6. End with exactly one low-friction CTA. Follow-up variants are optional drafts and inherit the same evidence and suppression checks.
+7. Run `neyvro_check_message_claims` before returning. Any unsupported, unverified, stale, or missing-evidence claim is flagged and prevents `draft_ready` status.
+
+## Output contract
+
+Return a structured result containing:
+
+```json
+{
+  "opportunity_id": "opp-123",
+  "buyer_id": "buyer-456",
+  "framework": "trigger-first",
+  "subject": "a question about the migration",
+  "personalized_opener": {"text": "...", "evidence_ids": ["ev-1"]},
+  "problem_hypothesis": {"text": "Could this change be creating ...?", "evidence_ids": ["ev-1"]},
+  "value_proposition": {"text": "...", "evidence_ids": ["positioning-v2"]},
+  "body": "...",
+  "call_to_action": "Worth comparing notes?",
+  "follow_up_variants": [],
+  "evidence_ids": ["ev-1", "positioning-v2"],
+  "flagged_claims": [],
+  "approval_status": "draft_ready|needs_evidence|blocked",
+  "send_allowed": false
+}
+```
+
+`send_allowed` is always false. Claim flags must identify the text, reason, and missing or invalid evidence IDs. Approval status means ready for human review, not permission to send.
+
+## Copy rules
+
+- Subject: 1–6 plain words, relevant rather than hype-driven.
+- Opener: one sentence about the recipient’s work, not generic praise or private personal details.
+- Body: one problem hypothesis, one approved value proposition, and one CTA; avoid feature lists and multiple asks.
+- Buyer-specific framing may differ for economic buyers, champions, users, technical evaluators, or approvers, but role assumptions must be marked as assumptions unless verified.
+- Keep follow-ups shorter than the initial email and do not introduce a new claim without evidence.
+
+## MCP contracts
+
+- `neyvro_draft_email` — create a draft proposal from authorized opportunity, buyer, evidence, and approved positioning context.
+- `neyvro_check_message_claims` — validate prospect and product claims, evidence links, suppression state, and approval readiness.
+- `neyvro_get_email_draft` — retrieve an existing draft by exact identifier and version.
+
+These contracts are draft/proposal operations only. Integrate with Neyvro follow-up and outreach services only for supported draft storage or review state; sending requires a separate approved action, mailbox permission, and idempotency key outside this skill.
+
+See also: `account-research` for evidence, `outreach-personalization` for non-creepy relevance, `email-deliverability` for delivery controls, and `multichannel-sequences` for cadence design.
 
 ---
 
@@ -293,35 +407,86 @@ Research may read authorized company, buyer, investigation, and pipeline context
 
 ---
 
-<!-- email-deliverability/SKILL.md version 0.1.0 -->
+<!-- email-deliverability/SKILL.md version 0.2.0 -->
 
 ---
 name: email-deliverability
-description: Activate when assessing sending-domain readiness, authentication, reputation, pacing, bounce, or complaint risk.
-version: 0.1.0
-maturity: contract
-mode: research
-required_scopes: ["intelligence:read"]
-related_skills: ["cold-email-writing","multichannel-sequences","outbound-metrics-and-benchmarks"]
+description: Activate when assessing authorized Gmail or Microsoft mailbox readiness, SPF/DKIM/DMARC configuration, sender limits, bounce or complaint risk, recipient hygiene, or safe email ramp-up; never change DNS or send mail.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read"]
+  related_skills: ["cold-email-writing", "multichannel-sequences", "outbound-metrics-and-benchmarks"]
 ---
 
-# email deliverability
+# Email deliverability
 
-Research may inspect authorized mailbox and operation status. Draft mode produces remediation plans; it must not change DNS, mailbox settings, or send volume.
+Assess sender safety from authorized mailbox/provider telemetry and explicitly reported DNS configuration. Deliverability is an operational health review, not a promise of inbox placement. Never invent scores, provider health, DNS records, or metrics.
 
-## Behavior modes
+## Operating modes
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
+- **Knowledge-only:** explain SPF, DKIM, DMARC, pacing, list hygiene, bounce, complaint, and unsubscribe controls without login or external calls.
+- **Connected read-only audit:** inspect authorized Gmail or Microsoft mailbox connection status, provider-reported limits/metrics, recipient verification, suppression, and any customer-authorized DNS evidence.
+- **Draft-only remediation:** produce an editable checklist or ramp recommendation. Do not change DNS, mailbox settings, sender identity, limits, or sending volume.
+- **External action:** test mail, DNS updates, mailbox changes, and sends require the relevant provider permission and explicit approval; this skill exposes no mutation or send operation.
 
-## Contract
+## Audit sequence
 
-- Activation: Activate when assessing sending-domain readiness, authentication, reputation, pacing, bounce, or complaint risk.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+1. Confirm the mailbox provider (`gmail` or `microsoft`), authorized connection, sender identity, sending domain, and tenant/workspace scope. A disconnected or unauthorized mailbox is `blocked` for sending readiness.
+2. Check SPF, DKIM, and DMARC only from an authorized DNS check or customer-supplied record. If DNS access was not authorized, report `unknown`—do not perform a lookup or infer a pass.
+3. Read provider-reported daily limits, sent count, remaining capacity, throttles, bounces, complaints, and unsubscribe events. Include the provider, observation time, and measurement window.
+4. Check recipient hygiene before any proposed send: verified status, stale/unverified addresses, catch-all/risky addresses, opt-outs, suppression lists, repeated bounces, existing customers, and active follow-up stops.
+5. Compare observed volume with the configured limit and ramp stage. Recommend gradual ramp-up and even pacing for new senders; warmup is guidance, never a guarantee of deliverability.
+6. Return verified checks, provider health signals, best-practice recommendations, and unknown/unavailable metrics as separate sections. Use the most restrictive safe interpretation when a hard safety signal is present.
+
+## Authentication guidance
+
+| Check | Safe interpretation |
+| --- | --- |
+| SPF | One authoritative SPF record should authorize all actual sending services; missing, conflicting, or unverified is not ready. |
+| DKIM | Signing should be enabled for the sending domain/provider; an unknown selector or unverified signature remains unknown. |
+| DMARC | A published policy and aligned SPF/DKIM are required for a trustworthy configuration; report the observed policy without promising placement. |
+| Sender identity | The authenticated mailbox and From identity must be authorized by the provider and workspace. |
+
+Do not require direct DNS access when the customer has not authorized it. Never change DNS automatically. Do not send an external test message without approval.
+
+## Safety thresholds and recommendations
+
+Treat provider thresholds as authoritative when supplied; otherwise label benchmark guidance as a recommendation, not an observed result. Stop or review when daily limits are exceeded, repeated bounces rise, complaints occur, recipients are unverified, or suppression/opt-out state is uncertain. Honor unsubscribe and suppression immediately. Do not claim an inbox-placement percentage from bounce, open, or reply data.
+
+## Required output
+
+Return structured data with:
+
+```json
+{
+  "status": "ready|review|blocked|unknown",
+  "provider": "gmail|microsoft|unknown",
+  "verified_configuration_checks": [],
+  "provider_health_signals": [],
+  "recommendations": [],
+  "unknown_metrics": [],
+  "recipient_safety": {"unverified": 0, "suppressed": 0, "repeated_bounces": 0},
+  "sender_limits": {"daily_limit": null, "sent_today": null, "remaining": null},
+  "authentication": {"spf": "verified|missing|failed|unknown", "dkim": "verified|missing|failed|unknown", "dmarc": "verified|missing|failed|unknown"},
+  "send_allowed": false
+}
+```
+
+Every observed check includes source, observed time, and provider where available. `send_allowed` is always false: this skill can inform another approved workflow but cannot send, warm up, schedule, or mutate configuration.
+
+## Optional read-only MCP contracts
+
+- `neyvro_get_mailbox_health` — Gmail/Microsoft connection, sender identity, authorization, and provider health.
+- `neyvro_get_sender_limits` — provider limits, sent count, remaining capacity, throttles, and ramp state.
+- `neyvro_get_delivery_metrics` — provider-reported bounce, complaint, unsubscribe, and delivery metrics with windows.
+- `neyvro_audit_email_configuration` — authorized SPF/DKIM/DMARC and sender-configuration audit.
+
+They are disabled without an authenticated adapter. Adapter setup requires a tenant-scoped Gmail or Microsoft connection, read-only provider permission, provider credential reference, and—only if DNS checks are requested—explicit customer authorization for DNS inspection. No credentials belong in skill files.
+
+See also: `cold-email-writing` for copy, `multichannel-sequences` for cadence, and `outbound-metrics-and-benchmarks` for denominators and trend analysis.
 
 ---
 
@@ -661,131 +826,478 @@ Load these on demand, only when the recommendation needs them:
 
 ---
 
-<!-- ideal-customer-profile/SKILL.md version 0.1.0 -->
+<!-- ideal-customer-profile/SKILL.md version 0.2.0 -->
 
 ---
 name: ideal-customer-profile
-description: Activate when defining, refining, scoring, or reviewing an ideal customer profile, buyer roles, triggers, or anti-ICP.
-version: 0.1.0
-maturity: contract
+description: Activate when defining, refining, scoring, or reviewing an ICP, buyer personas, target-account filters, trigger events, or anti-ICP rules.
+version: 0.2.0
+maturity: playbook
 mode: research
-required_scopes: ["intelligence:read"]
-related_skills: ["gtm-strategy","account-research","buyer-matching"]
+required_scopes: [intelligence:read, proposals:write]
+related_skills: [gtm-strategy, account-research, evidence, buyer-matching, company-changes]
 ---
 
-# ideal customer profile
+# Ideal Customer Profile (ICP)
 
-Turn onboarding and confirmed research context into explicit, filterable ICP criteria. Research requires authorized Neyvro onboarding/analysis data; writes preserve versioning and workspace ownership.
+An ICP describes the companies most likely to buy, succeed, retain, and expand.
+It is narrower than the total addressable market. A persona describes the
+people inside those companies. Use Neyvro's existing onboarding, confirmed ICP,
+monitoring, company-intelligence, and opportunity evidence; do not create a
+second customer database.
 
-## Behavior modes
+This skill works without login as a knowledge-only advisor. Connected reads are
+disabled unless a real Neyvro adapter is injected. Customer-approved ICP settings
+are never changed by evaluation or recommendation; changes are proposal-only and
+require explicit authorization and approval.
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
+## 1. Build the ICP from customer reality
 
-## Contract
+Start from the existing onboarding and opportunity model:
 
-- Activation: Activate when defining, refining, scoring, or reviewing an ideal customer profile, buyer roles, triggers, or anti-ICP.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+1. Identify the product, customer problem, outcome, pricing unit, and delivery
+   constraints.
+2. Compare best customers with churned, lost, or poor-fit accounts.
+3. Extract only attributes that can be observed or filtered: industry, size,
+   geography, technology, buyer role, problem, and trigger.
+4. Record the source, date, confidence, and whether each attribute is observed,
+   customer-stated, inferred, unknown, or blocked.
+5. Keep the initial ICP to 3–6 high-signal criteria; place exploratory signals in
+   a research backlog rather than quietly widening the target.
+
+Do not derive the ICP from closed-won revenue alone. Retention, expansion,
+time-to-value, support burden, implementation effort, and disqualification
+patterns are equally important.
+
+## 2. Firmographic and market criteria
+
+Return explicit filters, ranges, and exclusions:
+
+| Dimension | Examples | Required treatment |
+|---|---|---|
+| Industry | security, healthcare, fintech, manufacturing, SaaS | Use normalized industry names or codes; list excluded industries and why |
+| Company size | employees, revenue, locations, business model | Use ranges; mark missing employee/revenue data as unknown |
+| Geography | country, region, timezone, language, regulatory regime | Separate serviceable regions from researched regions |
+| Company type | B2B/B2C, public/private, startup/enterprise, agency/competitor | Define anti-ICP types explicitly |
+| Economics | budget, ACV, buying committee, implementation capacity | Never infer budget from brand size alone |
+
+A company is not a fit because it is large, famous, or in a target country.
+Those are at most one dimension in the scorecard.
+
+## 3. Technographic criteria
+
+Model the technology as a filterable set:
+
+- required technologies: absence is a mismatch or research gap;
+- complementary technologies: positive fit when verified;
+- migration technologies: relevant when a transition creates the problem;
+- excluded technologies: anti-ICP or implementation incompatibility;
+- unknown stack: do not treat as a match.
+
+Technology signals must be source-attributed. Examples of useful signals include
+cloud expansion, migration from a legacy platform, security tooling changes, and
+new infrastructure ownership. A named technology without a source is an
+assumption, not evidence.
+
+## 4. Buyer personas and customer problems
+
+Separate the account from the people:
+
+| Persona field | Output |
+|---|---|
+| Role and seniority | economic buyer, champion, user, approver, blocker |
+| Job to be done | what the person must accomplish |
+| Problem | operational or business problem and cost of inaction |
+| Buying influence | decision, budget, implementation, security, procurement |
+| Evidence | source, freshness, confidence, and unknowns |
+
+Map each ICP problem to the buyer role that experiences it and the evidence that
+shows it exists. Do not call a company qualified just because a target title
+appears in a directory; buyer-role evidence and company-fit evidence must be
+evaluated together.
+
+## 5. Trigger events and monitoring
+
+Use recent, attributable triggers to prioritize timing, not to prove intent.
+Neyvro monitoring/company intelligence may look for:
+
+- technology migration;
+- cloud expansion;
+- new security requirements or compliance deadlines;
+- engineering or security hiring;
+- funding or budget expansion;
+- leadership changes;
+- product launches;
+- relevant M&A, outages, public pain, or competitor change.
+
+Every trigger must include source, observed date, subject, confidence, and an
+expiry/freshness rule. One trigger alone never qualifies a company. It can
+increase priority only when the underlying firmographic, technology, buyer, or
+problem criteria are also corroborated.
+
+## 6. Weighted fit scorecard
+
+Use a transparent 0–100 score. Default weights are adjustable only through an
+authorized ICP proposal:
+
+| Dimension | Default weight |
+|---|---:|
+| Industry | 20 |
+| Company size/economics | 15 |
+| Geography | 10 |
+| Technology | 15 |
+| Buyer role | 15 |
+| Problem | 15 |
+| Trigger | 10 |
+
+For each dimension use match, mismatch, or unknown. Award a dimension's
+weight only when the match is supported by evidence. Suggested tiers:
+
+- A — 80–100: prioritize now after checking disqualifiers and contactability.
+- B — 60–79: nurture or research; do not assume buying intent.
+- C — 0–59: low priority or skip for now.
+- Disqualified: hard anti-ICP rule; never promote because of a high score.
+- Incomplete: insufficient corroboration or evidence; not qualified.
+
+A company may be qualified only when:
+
+1. score is at least 60;
+2. at least two independent dimensions match;
+3. at least two evidence records support those dimensions;
+4. no hard exclusion is present; and
+5. required information is not materially unknown.
+
+This prevents a single signal, such as funding or hiring, from being presented as
+customer qualification.
+
+## 7. Anti-ICP and disqualification rules
+
+Define hard exclusions before sourcing:
+
+- excluded industries, geographies, company types, or regulatory regimes;
+- competitors, partners that cannot buy, or existing customers handled elsewhere;
+- too small to afford or support the product;
+- implementation environment that cannot use the product;
+- prohibited jurisdictions or unsupported languages;
+- students, job seekers, personal projects, or free-email-only targets where
+  they cannot become legitimate customers;
+- explicit suppression, opt-out, privacy, or ownership-removal state.
+
+A hard exclusion returns disqualified even when other dimensions match.
+Unknown returns incomplete, not disqualified, unless policy explicitly defines
+the missing fact as a required exclusion check.
+
+## 8. Evidence-backed refinement
+
+Refine the ICP only from aggregated outcomes and reviewed evidence:
+
+- compare A/B/C conversion, retention, expansion, cycle time, and support burden;
+- review false positives, false negatives, losses, churn, and disqualifications;
+- identify which criteria predicted a positive outcome and which were vanity;
+- propose weight, range, inclusion, exclusion, or trigger changes;
+- attach evidence IDs and show the before/after effect;
+- require customer approval before changing the stored ICP version.
+
+The evaluation operation is read-only. neyvro_propose_icp_changes creates a
+reviewable proposal and must not mutate approved settings.
+
+## 9. Output contract
+
+Return:
+
+- icp_version and a concise ICP summary;
+- firmographic, technographic, size, geography, buyer, problem, and trigger
+  criteria;
+- industry/geography/company-type exclusions and anti-ICP rules;
+- weighted scorecard and A/B/C thresholds;
+- buyer personas mapped to problems and evidence;
+- search specification with filterable fields;
+- assumptions and confidence;
+- monitoring signals and freshness rules;
+- research gaps;
+- for a company evaluation: score, tier, status, matched dimensions, missing
+  dimensions, disqualifiers, reasons, and evidence.
+
+When the data is incomplete, return recommended_motion: unknown, a short
+decision tree, and the smallest set of questions needed to decide. Never
+fabricate a company attribute, buyer, technology, trigger, or qualification.
+
+## 10. Neyvro MCP contracts
+
+These are safe service contracts, not claims that endpoints currently exist in
+this repository. Without an adapter, return disabled and no fabricated data.
+
+### neyvro_get_icp
+
+Input: { "workspace_id": "uuid", "version": "latest|uuid" }
+
+Output: { "status": "available|disabled|blocked", "icp": {}, "evidence": [], "research_gaps": [] }
+
+Reads the existing customer-approved ICP and onboarding/opportunity context. It
+must enforce workspace authorization and never create a duplicate customer
+record.
+
+### neyvro_evaluate_icp_fit
+
+Input: { "workspace_id": "uuid", "company_id": "uuid", "evidence_ids": [] }
+
+Output: { "status": "available|disabled|blocked", "fit": {}, "evidence": [], "research_gaps": [] }
+
+Reads authorized company-intelligence and monitoring evidence, then evaluates
+the stored ICP without changing it. A single signal must never produce
+qualified.
+
+### neyvro_propose_icp_changes
+
+Input: { "workspace_id": "uuid", "changes": {}, "evidence_ids": [], "idempotency_key": "uuid" }
+
+Output: { "status": "proposed|disabled|blocked", "proposal_id": "uuid", "approval_required": true }
+
+Creates a versioned review proposal. It cannot update customer-approved ICP
+settings, onboarding answers, opportunity records, or monitoring rules without
+a separate authorized approval flow.
+
+## Behavior modes and safety
+
+- Knowledge-only: explain ICP design and scorecard use with supplied facts; no
+  Neyvro login or MCP is required.
+- Research: read tenant-scoped onboarding, company intelligence, monitoring, and
+  opportunity evidence; return provenance and gaps.
+- Draft-only: produce a proposed ICP or fit evaluation; do not persist it.
+- External action: only propose changes through the approval contract; never
+  source, message, enroll, or mutate customer settings directly.
+
+Load related skills on demand, not automatically: gtm-strategy for motion fit,
+account-research for account evidence, evidence for provenance, and
+buyer-matching for role-level research.
 
 ---
 
-<!-- lead-sourcing-and-enrichment/SKILL.md version 0.1.0 -->
+<!-- lead-sourcing-and-enrichment/SKILL.md version 0.2.0 -->
 
 ---
 name: lead-sourcing-and-enrichment
-description: Activate when finding or enriching ICP-fit companies and contacts with verified, source-labeled data.
-version: 0.1.0
-maturity: contract
-mode: research
-required_scopes: ["intelligence:read"]
-related_skills: ["ideal-customer-profile","account-research","evidence"]
+description: Activate when selecting ICP-fit accounts, finding buyer roles, or enriching authorized business contacts with deduplicated, provenance-labeled, verified data.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read"]
+  related_skills: ["ideal-customer-profile", "account-research", "evidence", "buyer-matching", "email-deliverability"]
 ---
 
-# lead sourcing and enrichment
+# Lead sourcing and enrichment
 
-Research requires authorized Neyvro providers and must preserve source, verification, freshness, and suppression states. Never guess an identity or email.
+Turn an approved ICP into a clean, reviewable buyer list. Select accounts first, infer roles second, then enrich contacts through a bounded waterfall. A discovered person is not automatically a reachable lead: identity, company match, provenance, verification, freshness, permitted use, suppression, and entitlement must all be explicit.
 
-## Behavior modes
+## Operating modes
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
+- **Knowledge-only:** explain sourcing, verification, or list-hygiene methods without login, provider calls, or real-person claims.
+- **Connected research:** read authorized ICP, company, opportunity, CRM, suppression, and provider results. Return unknowns when a service is unavailable.
+- **Draft-only:** produce a proposed target list or enrichment plan. Never create a CRM record, enroll a sequence, or send a message.
+- **External action:** requires tenant scope, provider permission, customer entitlement, usage budget, explicit approval, audit logging, and an idempotency key.
 
-## Contract
+## Discovery workflow
 
-- Activation: Activate when finding or enriching ICP-fit companies and contacts with verified, source-labeled data.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+1. Apply the customer-approved ICP to companies. Exclude existing customers, active opportunities, suppressed accounts, competitors, and accounts with a disqualifier before searching for people.
+2. Infer the buying committee from the problem and approved persona model: economic buyer, champion, user, technical evaluator, approver, and blocker. Role inference is a hypothesis until a source verifies the current role.
+3. Match existing CRM and opportunity contacts before paying a provider. Reuse a fresh authorized contact record; do not create duplicates for a changed title or alternate spelling.
+4. Use a waterfall from the lowest-cost authorized source to the next provider. Stop after a verified hit or when the customer budget/rate limit is exhausted. Paid enrichment is disabled without explicit entitlement and remaining usage budget.
+5. Verify company identity and current employment together. A contact from a similarly named or former company is a `wrong_company` exclusion, not a usable match.
+6. Verify email separately from identity. `verified` means the provider or verification service confirmed the address; a guessed/pattern-generated address is never verified. Catch-all, unknown, risky, invalid, bounced, and unverified states remain non-verified.
+7. Normalize and deduplicate by provider person ID, normalized email, and `(name, company domain, current role)` fallback. Preserve all source references and the strongest verification history.
+8. Check global/workspace suppression, opt-outs, existing-customer exclusions, and permitted-use constraints before returning a contact. Never expose private personal data or scrape a platform against its rules.
+
+## Contact contract
+
+For every discovered person return:
+
+```json
+{
+  "name": "Alex Morgan",
+  "company": "Example Inc",
+  "current_role": "VP Engineering",
+  "buyer_category": "economic_buyer|champion|user|technical_evaluator|approver|blocker|unknown",
+  "source": {"provider": "crm|provider-name", "record_id": "...", "url": "..."},
+  "verification_status": "verified|unverified|catch_all|invalid|stale|opted_out|wrong_company",
+  "last_verified_at": "2026-10-20T00:00:00Z",
+  "opportunity_ids": ["opportunity-123"],
+  "contact_details": {
+    "email": "alex@example.com",
+    "email_provenance": "provider_verified|crm_verified|pattern_guess|unknown",
+    "permitted_use": true,
+    "permitted_use_basis": "workspace policy or provider terms"
+  }
+}
+```
+
+Email and phone fields require source, observed time, verification result, and permitted-use basis. A pattern guess may be returned only as `unverified` when the workflow explicitly allows it; never use it as proof of identity or deliverability.
+
+## Budgets, freshness, and failure behavior
+
+- Track `provider_calls`, `paid_calls`, `units_consumed`, `units_remaining`, and per-provider rate-limit state.
+- Do not call a paid provider if `entitled` is false, the usage budget is exhausted, or the provider has no permitted-use basis.
+- Default contact freshness is 30 days unless the customer or provider supplies a stricter window. A stale record must be re-verified or marked `stale`; it must not silently become current.
+- Provider timeout, quota, auth, policy, or malformed-response failures are recorded as provider events and do not become guessed data. Continue to the next authorized waterfall step only when its budget and policy allow.
+- Opt-outs and suppression are hard stops. Existing customers and active opportunities are excluded by default; a customer-approved exception must be explicit and auditable.
+
+## MCP contracts
+
+Use authenticated, tenant-scoped adapters with `intelligence:read`:
+
+- `neyvro_search_buyers` — search ICP-filtered accounts and buyer roles.
+- `neyvro_get_opportunity_buyers` — read existing opportunity contacts and relationship context.
+- `neyvro_enrich_contact` — run bounded waterfall enrichment; paid calls require entitlement and usage budget.
+- `neyvro_get_contact_verification` — read verification, freshness, provenance, opt-out, and permitted-use state.
+
+The skill prefers existing Neyvro buyer/CRM services and does not create a duplicate contact database. Provider adapters must use approved B2B APIs or first-party CRM data, respect provider terms, and never scrape prohibited platforms.
+
+## Structured result
+
+Return `accounts_considered`, `accounts_excluded`, `contacts`, `duplicates_removed`, `suppressed_contacts`, `provider_events`, `usage`, and `research_gaps`. Include a sample result even in knowledge-only mode, with fictional values clearly marked as examples. A contact is eligible for downstream outreach only when `verification_status` is `verified`, `permitted_use` is true, and no suppression or existing-customer exclusion applies.
+
+See also: `ideal-customer-profile` for fit, `account-research` for account signals, `buyer-matching` for role hypotheses, and `email-deliverability` for sending controls.
 
 ---
 
-<!-- linkedin-outreach/SKILL.md version 0.1.0 -->
+<!-- linkedin-outreach/SKILL.md version 0.2.0 -->
 
 ---
 name: linkedin-outreach
-description: Activate when planning or reviewing compliant LinkedIn prospecting and relationship outreach.
-version: 0.1.0
-maturity: contract
-mode: knowledge
-required_scopes: []
-related_skills: ["account-research","outreach-personalization","multichannel-sequences"]
+description: Activate when researching an authorized professional profile, selecting a relevant LinkedIn outreach angle, drafting a connection note or direct message, or recording customer-confirmed manual outreach; never automate LinkedIn actions.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: draft
+  required_scopes: ["intelligence:read", "proposals:write"]
+  related_skills: ["account-research", "outreach-personalization", "multichannel-sequences", "cold-email-writing"]
 ---
 
-# linkedin outreach
+# LinkedIn outreach
 
-Provide safety-aware planning and drafts. Neyvro currently has no verified LinkedIn execution connector, so live research and external actions are blocked until an authorized provider contract exists.
+Assist compliant professional relationship outreach using verified company and buyer evidence. LinkedIn is an assisted channel in Neyvro: research permitted context, draft, review, open the profile, let the customer act manually, and record the customer-confirmed action.
 
-## Behavior modes
+## Supported workflow
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
+1. Read an authorized prospect profile, company context, current role, relationship state, and dated professional evidence. Cross-tenant IDs are non-disclosing `not_found`/`forbidden` results.
+2. Check profile freshness and current-role evidence. If the profile is missing, stale, unauthorized, or provider-restricted, report the gap rather than guessing.
+3. Select one work-relevant angle: a verified company change, a verified professional post or stated responsibility, or an authorized relationship context. Avoid sensitive personal traits, private details, generic praise, and manufactured familiarity.
+4. Draft one of: a pitch-free connection note, a short direct message for an existing relationship, or a meaningful engagement suggestion tied to a verified post. Keep each claim linked to evidence IDs.
+5. Require customer review and approval. The customer opens the profile and manually performs the action on LinkedIn. Record only a customer-confirmed action and its timestamp.
+6. For relationship-aware follow-up, read the recorded relationship state and stop when the prospect declined, opted out, or no longer has a verified current role. Never infer acceptance, reply, or relationship status from an attempted draft.
 
-## Contract
+## Explicitly unsupported
 
-- Activation: Activate when planning or reviewing compliant LinkedIn prospecting and relationship outreach.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+Neyvro must not build or use unauthorized scraping, browser-account hijacking, cookie-based bots, stealth automation, prohibited bulk connection requests, automated DMs, automated comments/reactions, or any capability that violates LinkedIn or provider terms. Direct send/connection/comment tools are unsupported unless an officially authorized platform capability is later supplied and separately approved. Never fabricate execution, delivery, acceptance, or engagement.
+
+## Draft outputs
+
+Return structured drafts such as:
+
+```json
+{
+  "status": "draft_ready|needs_evidence|stale|missing_profile|unsupported|blocked",
+  "prospect_id": "person-123",
+  "action": "connection_note|direct_message|engagement_suggestion",
+  "message": "...",
+  "engagement_suggestion": null,
+  "angle": "...",
+  "evidence_ids": ["ev-1"],
+  "flagged_claims": [],
+  "relationship_state": "not_connected|pending|connected|unknown",
+  "approval_status": "review_required|blocked|unsupported",
+  "manual_steps": ["Review draft", "Open profile", "Customer acts manually", "Record confirmed action"],
+  "external_action_executed": false
+}
+```
+
+Connection notes should be brief and non-pitchy. A direct message should be drafted only when relationship context permits it; otherwise return a connection-note suggestion. Engagement should add a real professional observation, not a disguised sales pitch. One soft ask maximum, and no automated follow-up.
+
+## MCP contracts
+
+- `neyvro_get_linkedin_prospect_context` — read tenant-scoped professional profile, company, role, permitted posts, evidence, and freshness.
+- `neyvro_draft_linkedin_message` — create a reviewable connection-note, DM, or engagement draft; it does not send or publish.
+- `neyvro_get_social_relationship` — read authorized connection, prior interaction, opt-out, and follow-up state.
+- `neyvro_record_manual_outreach` — record an action only after the customer confirms they manually performed it; it does not call LinkedIn.
+
+All contracts require an authorized adapter and tenant scope. If a provider is unavailable, return `disabled` with setup requirements. Provider setup must use officially authorized platform capabilities and permitted data providers; credentials, cookies, and session tokens never belong in skills or logs.
+
+See also: `account-research` for company evidence, `outreach-personalization` for relevance, `multichannel-sequences` for reviewable cadence, and `cold-email-writing` for email alternatives.
 
 ---
 
-<!-- multichannel-sequences/SKILL.md version 0.1.0 -->
+<!-- multichannel-sequences/SKILL.md version 0.2.0 -->
 
 ---
 name: multichannel-sequences
-description: Activate when designing, reviewing, or operating a multi-step outreach cadence with explicit branch and stop logic.
-version: 0.1.0
-maturity: contract
-mode: draft
-required_scopes: ["proposals:write"]
-related_skills: ["cold-email-writing","linkedin-outreach","reply-handling-and-objections"]
+description: Activate when designing, reviewing, compiling, or operating a customer-approved multichannel outreach sequence with deterministic timing, branches, eligibility checks, and stop rules.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: draft
+  required_scopes: ["intelligence:read", "proposals:write"]
+  related_skills: ["cold-email-writing", "linkedin-outreach", "email-deliverability", "reply-handling-and-objections"]
 ---
 
-# multichannel sequences
+# Multichannel sequences
 
-Draft mode produces steps, timing, branches, suppression rules, and a proposed sequence. Launch, pause, resume, or send requires approval, provider permissions, and idempotent operations.
+Design a declarative campaign specification and compile it into a deterministic state machine. Sequence planning and compilation are safe local operations; actual sending must use a separately authorized Neyvro campaign/follow-up backend after explicit customer approval.
 
-## Behavior modes
+## Declarative campaign specification
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
+Each step must define all of these fields:
 
-## Contract
+```json
+{
+  "step_id": "step-1",
+  "channel": "email|linkedin_assisted|authorized_social",
+  "recipient": {"buyer_id": "buyer-1", "company_id": "company-1"},
+  "sender": {"mailbox_id": "mailbox-1", "identity": "sales@example.com"},
+  "message": {"draft_id": "draft-1", "content": "reviewed content"},
+  "scheduled_time": "2026-10-24T09:00:00Z",
+  "preconditions": ["sender_available", "recipient_eligible", "approval_current"],
+  "stop_conditions": ["reply", "unsubscribe", "hard_bounce", "meeting_booked", "customer_cancelled"],
+  "approval_version": "approval-v1"
+}
+```
 
-- Activation: Activate when designing, reviewing, or operating a multi-step outreach cadence with explicit branch and stop logic.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+Only data-defined channels, preconditions, stop conditions, and branch targets are accepted. Never compile or execute arbitrary LLM-generated code. Unsupported channels are rejected or marked `unsupported`; they are never silently treated as email.
+
+## Campaign lifecycle
+
+The compiler and runtime support exactly these states:
+
+`DRAFT → PROPOSED → PENDING_APPROVAL → APPROVED → SCHEDULED → RUNNING → COMPLETED`
+
+Any running campaign may enter `PAUSED`, `CANCELLED`, or `FAILED`. Approval revocation, sender unavailability, recipient ineligibility, provider failure, or an operator pause must prevent dispatch. Approval is versioned; a step approved under an old version cannot run under a new or revoked version.
+
+## Required safety rules
+
+- Stop immediately after a genuine reply, unsubscribe/opt-out, hard bounce, meeting booking, or customer cancellation.
+- Recheck sender availability, mailbox permission, recipient eligibility, suppression, current approval version, and channel capability immediately before every dispatch.
+- Deduplicate jobs with a deterministic campaign/step/recipient key. Concurrent reply events are idempotent; the first stop event wins and later dispatches are rejected.
+- A paused campaign schedules no new work. Resume requires a fresh authorized state transition and eligibility recheck.
+- LinkedIn and social steps are assisted unless an officially authorized provider capability exists. Draft/open-profile/manual-action paths must not become automated sends.
+- Scheduling must use provider timezone and customer-approved windows; do not assume a local timezone.
+
+## Structured output
+
+Return the declarative spec, compiled state machine, deterministic job IDs, branch/exit rules, approval version, current campaign state, and warnings. Draft/proposal outputs are reviewable and do not send. A send-capable backend must report provider, approval, idempotency, and operation status.
+
+## MCP contracts
+
+- `neyvro_create_campaign_draft` — validate and persist a draft specification.
+- `neyvro_propose_campaign` — submit a versioned campaign for customer approval.
+- `neyvro_get_campaign` — read the exact campaign specification and version.
+- `neyvro_pause_campaign` — request an approved pause/stop through the existing campaign service.
+- `neyvro_get_campaign_status` — read state, stop reason, jobs, provider health, and approval version.
+
+Use Neyvro’s existing campaign and follow-up implementation where available. If scheduler integration is absent, return a deterministic schedule plan and `disabled` adapter status; do not create a second sending engine. Sending, scheduling on a live provider, resuming, and cancellation must remain behind the separately authorized approval/idempotency boundary.
+
+See also: `cold-email-writing` for email drafts, `linkedin-outreach` for assisted social steps, `email-deliverability` for sender safety, and `reply-handling-and-objections` for reply-driven stops.
 
 ---
 
@@ -853,67 +1365,310 @@ Research may read authorized operations, mailbox, pipeline, and investigation me
 
 ---
 
-<!-- outreach-personalization/SKILL.md version 0.1.0 -->
+<!-- outreach-personalization/SKILL.md version 0.2.0 -->
 
 ---
 name: outreach-personalization
-description: Activate when converting verified company or buyer evidence into relevant, non-creepy outreach personalization.
-version: 0.1.0
-maturity: contract
-mode: draft
-required_scopes: ["intelligence:read","proposals:write"]
-related_skills: ["account-research","cold-email-writing","evidence"]
+description: Activate when turning authorized company, buyer, opportunity, positioning, and brand-voice context into evidence-linked personalization snippets at strategic, qualified, or lightweight effort levels; never send messages.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: draft
+  required_scopes: ["intelligence:read", "proposals:write"]
+  related_skills: ["account-research", "cold-email-writing", "linkedin-outreach", "ideal-customer-profile"]
 ---
 
-# outreach personalization
+# Outreach personalization
 
-Create snippets tied to evidence IDs and mark uncertainty. Personal information must not be invented, inferred from sensitive traits, or copied without a source.
+Create reusable, channel-neutral snippets that make outreach relevant without pretending familiarity. Use customer-approved positioning, digital-twin state, verified company signals, buyer responsibilities, opportunity hypotheses, authorized relationship history, and approved brand voice. This skill drafts and validates only; it never sends messages.
 
-## Behavior modes
+## Effort levels
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
+| Level | Use when | Required personalization |
+| --- | --- | --- |
+| High-touch strategic | A-tier or strategic opportunity | verified trigger, why-now context, buyer responsibility, pain hypothesis, approved benefit, proof, and one CTA |
+| Medium-touch qualified | ICP-fit account with bounded research | one verified company signal, role-relevant hypothesis, approved benefit, and one CTA |
+| Lightweight relevant | volume or low-information account | generic product messaging plus verified role/industry framing; no invented account claim |
 
-## Contract
+Effort controls research and copy depth; it never lowers evidence or authorization standards. If evidence is insufficient for the selected level, downgrade the output or return `needs_evidence`.
 
-- Activation: Activate when converting verified company or buyer evidence into relevant, non-creepy outreach personalization.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+## Snippet categories
+
+Return swappable snippets for:
+
+- `verified_trigger` — one current, source-linked company change;
+- `why_now` — why the change may make the conversation timely, clearly labeled as an inference;
+- `relevant_pain_hypothesis` — a conditional, buyer-role-specific hypothesis, never a stated fact without evidence;
+- `product_benefit` — approved positioning or clearly labeled generic product messaging;
+- `proof_point` — approved, source-linked proof only;
+- `call_to_action` — one low-friction ask, without a guarantee.
+
+Every non-generic snippet carries `evidence_ids`, source references, observed time, and confidence. Generic product messaging is labeled `generic: true` and must not be presented as prospect personalization.
+
+## Workflow and guardrails
+
+1. Read the authorized customer positioning, brand voice, company twin/signals, buyer responsibilities, opportunity hypothesis, and relationship history. Keep tenant and recipient scope intact.
+2. Select at most one strongest current trigger. Contradictory signals remain visible, lower confidence, and block a trigger claim until resolved.
+3. Match the angle to the buyer’s verified role and responsibilities. If the evidence concerns another role, mark `buyer_role_mismatch` and do not use it as individualized copy.
+4. Separate observation, inference, generic product material, and proof. Never fabricate familiarity, compliments, personal details, outcomes, customer results, guarantees, or product capabilities.
+5. Avoid identical bodies across recipients. A reusable category is acceptable; the individualized trigger or role framing must differ when the account has distinct evidence. If no evidence differs, return generic messaging instead of fake personalization.
+6. Validate all snippets with `neyvro_validate_outreach_claims`. The result is reviewable draft material, never a send authorization.
+
+## Structured output
+
+```json
+{
+  "effort_level": "high_touch_strategic|medium_touch_qualified|lightweight_relevant",
+  "snippets": [{"category": "verified_trigger", "text": "...", "evidence_ids": ["ev-1"], "generic": false, "confidence": 0.9}],
+  "confidence_limitations": [],
+  "evidence_links": [{"evidence_id": "ev-1", "source": "...", "observed_at": "..."}],
+  "flagged_claims": [],
+  "brand_voice": {"status": "consistent|unknown|flagged", "applied": "..."},
+  "approval_status": "draft_ready|needs_evidence|blocked",
+  "send_allowed": false
+}
+```
+
+## MCP contracts
+
+- `neyvro_get_personalization_context` — read tenant-scoped positioning, digital-twin signals, buyer responsibilities, opportunity hypothesis, authorized relationship history, and brand voice.
+- `neyvro_generate_personalization` — generate versioned reviewable snippets for a selected effort level.
+- `neyvro_validate_outreach_claims` — validate evidence links, role fit, contradictions, generic labels, and brand-voice constraints.
+- `neyvro_get_brand_voice` — read the customer-approved voice and version.
+
+These contracts require an authorized adapter and never send. Integrate with cold email, LinkedIn-assisted, or sequence workflows only by passing reviewable draft snippets; external action remains separately approval-gated.
+
+See also: `account-research` for signals, `cold-email-writing` for email composition, `linkedin-outreach` for assisted social use, and `ideal-customer-profile` for buyer fit.
 
 ---
 
-<!-- positioning-and-messaging/SKILL.md version 0.1.0 -->
+<!-- positioning-and-messaging/SKILL.md version 0.2.0 -->
 
 ---
 name: positioning-and-messaging
-description: Activate when translating a product's differentiated value into positioning, message houses, or evidence-backed outreach angles.
-version: 0.1.0
-maturity: contract
+description: Activate when developing, reviewing, or refining product positioning, value propositions, battlecards, buyer messaging, or approved message-house claims.
+version: 0.2.0
+maturity: playbook
 mode: draft
-required_scopes: ["intelligence:read"]
-related_skills: ["gtm-strategy","ideal-customer-profile","cold-email-writing"]
+required_scopes: [intelligence:read, proposals:write]
+related_skills: [gtm-strategy, ideal-customer-profile, account-research, cold-email-writing]
 ---
 
-# positioning and messaging
+# Positioning and messaging
 
-Use supplied or authorized brief evidence to draft positioning and messaging. Draft mode produces editable artifacts; external publishing or sending requires approval.
+Positioning is the context that makes a product's value clear to a specific
+buyer. Messaging is how that context is expressed. Start with Neyvro's existing
+onboarding answers, product documents, approved positioning, approved claims,
+and evidence. Do not create a duplicate product database.
 
-## Behavior modes
+This skill works as a knowledge-only advisor when Neyvro is disconnected. In
+connected mode it reads authorized product context and approved claims. Drafts
+are reviewable; positioning, claims, brand voice, and external messages are not
+changed without an authorized proposal and approval.
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
+## 1. Build the product and category context
 
-## Contract
+Collect and label:
 
-- Activation: Activate when translating a product's differentiated value into positioning, message houses, or evidence-backed outreach angles.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+- product name, category, buyer, user, and job to be done;
+- documented capabilities and constraints;
+- real competitor alternatives, including manual work, spreadsheets,
+  in-house systems, delay, or doing nothing;
+- customer problems in the customer's language;
+- target industries, use cases, and buyer personas;
+- approved brand voice and words to prefer or avoid;
+- approved claims, proof points, sources, dates, and version;
+- unknowns and claims requiring review.
+
+Use a market category the buyer recognizes and can budget for. If category,
+capability, or problem information is missing, say so. Do not fill gaps with
+generic product marketing language and do not infer a capability from a product
+name.
+
+## 2. Positioning components
+
+Work through these five components:
+
+1. Competitive alternatives: what the buyer actually does without the product,
+   and where each alternative wins.
+2. Unique capabilities: documented capabilities that are meaningfully different
+   from the alternatives.
+3. Value: what the capability changes for the buyer, expressed as a problem or
+   outcome rather than a feature.
+4. Target persona: the buyer role that cares most about the value, plus users,
+   champions, approvers, and blockers.
+5. Category: the frame that helps the buyer understand what the product is.
+
+A feature is not differentiation until it explains a meaningful advantage against
+a real alternative. Be honest about where the alternative wins.
+
+## 3. Before / after / bridge
+
+Use this structure:
+
+- Before: the customer's current painful state, supported by customer language or
+  evidence.
+- After: the better state the product can credibly enable; label the outcome as a
+  hypothesis when proof is absent.
+- Bridge: the product's documented capabilities, kept brief.
+
+Lead with the buyer's outcome, not a feature list. Never turn an unapproved
+capability into a promise.
+
+## 4. Value proposition and message house
+
+Return:
+
+- a one-line value proposition: product category plus buyer-relevant outcome;
+- three message pillars;
+- one reason-to-believe or proof point under each pillar;
+- the caveat or unsupported claim under each pillar;
+- buyer-specific variants for the economic buyer, champion, user, approver, and
+  blocker where context supports them;
+- objection-aware reframes that acknowledge where alternatives may win.
+
+A message house is not a license to manufacture proof. If a pillar has no
+approved proof, mark it as a research gap and keep the language conditional.
+
+## 5. Differentiation and battlecards
+
+For each named alternative, create a compact battlecard:
+
+| Field | Requirement |
+|---|---|
+| Alternative | confirmed competitor, manual process, or status quo |
+| Buyer reason | why the buyer chooses it today |
+| Neyvro difference | documented capability and relevant buyer value |
+| Where the alternative wins | honest tradeoff |
+| Proof | approved claim/source or explicit missing proof |
+| Reframe | one respectful, non-defamatory response |
+| Do not claim | unsupported weakness or superiority |
+
+Never manufacture competitor weaknesses, customer results, testimonials, market
+share, certifications, or product capabilities. If competitor information is
+unverified, identify it as an information gap rather than a weakness.
+
+## 6. Buyer-specific messaging
+
+For each persona, map:
+
+- role and buying influence;
+- job and pain;
+- desired outcome;
+- message angle;
+- evidence/proof;
+- likely objection;
+- honest response;
+- next safe action.
+
+Use the customer's approved brand voice. If no voice is approved, use clear,
+specific, restrained language and mark voice as unconfirmed. Do not impersonate
+a customer or claim that a persona said something they did not say.
+
+## 7. Objection-aware messaging
+
+Handle objections by acknowledging the buyer's current alternative first:
+
+- “We already use a spreadsheet” → explain the documented gap the product closes;
+- “Our team can build this” → compare maintenance, ownership, and evidence only
+  when those facts are approved;
+- “We do not need this yet” → state the trigger or cost hypothesis and ask for
+  validation, not urgency theater;
+- “We need proof/security review” → return approved proof or identify exactly
+  what evidence is missing.
+
+No objection response may introduce a new unsupported claim.
+
+## 8. Versioning and approval
+
+Every generated positioning artifact returns a version and approval status:
+
+- draft: generated from supplied facts and not approved;
+- needs_approval: contains unsupported claims, missing proof, unconfirmed voice,
+  or changed positioning;
+- approved: only when the connected source contains an approved version and
+  every surfaced claim is within approved claims;
+- blocked: a required authorized source or approval is unavailable.
+
+Reading approved positioning is safe. Proposing changes is not persistence.
+Customer-approved positioning and claims must remain unchanged until a customer
+authorized proposal is approved by the existing Neyvro service.
+
+## 9. Structured output
+
+Return exactly these top-level fields:
+
+- positioning_summary: category, one-liner, before/after/bridge, and version;
+- target_persona: role, influence, evidence status, and buyer-specific context;
+- problem_statement: problem, cost/impact hypothesis, and evidence;
+- differentiation: documented capabilities, real alternatives, honest tradeoffs,
+  and battlecards;
+- proof_points: approved claims and sources only;
+- message_angles: persona-specific, objection-aware draft angles;
+- unsupported_claims: every capability, outcome, comparison, or proof that cannot
+  be safely stated as fact;
+- approval_status: draft, needs_approval, approved, or blocked.
+
+Also include assumptions, research gaps, brand-voice status, and evidence IDs
+inside the relevant objects. If product information is incomplete, return a
+useful framework with explicit gaps instead of inventing content.
+
+## 10. Neyvro MCP contracts
+
+These are safe adapter contracts. The current repository does not expose these
+endpoints, so connected functionality remains disabled until a real adapter is
+injected.
+
+### neyvro_get_product_context
+
+Input: { "workspace_id": "uuid" }
+
+Output: { "status": "available|disabled|blocked", "product_context": {}, "evidence": [], "research_gaps": [] }
+
+Reads existing onboarding, product documents, and approved workspace context. It
+must enforce tenant authorization and must not create a duplicate product record.
+
+### neyvro_get_positioning
+
+Input: { "workspace_id": "uuid", "version": "latest|uuid" }
+
+Output: { "status": "available|disabled|blocked", "positioning": {}, "version": "string", "approval_status": "string", "evidence": [] }
+
+Reads a versioned approved or draft positioning artifact without changing it.
+
+### neyvro_propose_positioning
+
+Input: { "workspace_id": "uuid", "positioning": {}, "evidence_ids": [], "idempotency_key": "uuid" }
+
+Output: { "status": "proposed|disabled|blocked", "proposal_id": "uuid", "version": "string", "approval_required": true }
+
+Creates a versioned review proposal only. It must not mutate approved
+positioning, claims, brand voice, onboarding, CRM, or outbound messages.
+
+### neyvro_get_approved_claims
+
+Input: { "workspace_id": "uuid", "version": "latest|uuid" }
+
+Output: { "status": "available|disabled|blocked", "claims": [], "version": "string", "evidence": [] }
+
+Reads the allowlist of claims that may be stated as fact. No approved claim may
+be silently edited or widened by this skill.
+
+## Behavior modes and safety
+
+- Knowledge-only: teach positioning and produce conditional drafts from supplied
+  facts; no login or MCP is required.
+- Research: read tenant-scoped product documents, positioning, claims, and
+  evidence; return provenance and gaps.
+- Draft-only: create a reviewable message house, battlecards, and persona
+  variants; do not publish or send.
+- External action: use only the proposal contract and require explicit approval,
+  audit logging, provider scope, and idempotency.
+
+Load related skills on demand: gtm-strategy for motion fit,
+ideal-customer-profile for target accounts, account-research for evidence, and
+cold-email-writing for channel-specific copy.
 
 ---
 
@@ -949,35 +1704,82 @@ Research may read investigations and prediction outputs. Predictions are advisor
 
 ---
 
-<!-- reply-handling-and-objections/SKILL.md version 0.1.0 -->
+<!-- reply-handling-and-objections/SKILL.md version 0.2.0 -->
 
 ---
 name: reply-handling-and-objections
-description: Activate when classifying a prospect reply, drafting a response, or deciding whether follow-up must stop.
-version: 0.1.0
-maturity: contract
-mode: research
-required_scopes: ["intelligence:read","proposals:write"]
-related_skills: ["cold-email-writing","discovery-and-qualification","multichannel-sequences"]
+description: Activate when retrieving and classifying an authorized email reply, drafting an objection-aware response, or stopping follow-up after a reply, rejection, unsubscribe, meeting, or out-of-office event.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read", "proposals:write"]
+  related_skills: ["cold-email-writing", "multichannel-sequences", "discovery-and-qualification"]
 ---
 
-# reply handling and objections
+# Reply handling and objections
 
-Research requires authorized mailbox messages. Draft responses are reviewable; sending or changing follow-up state requires approval, mailbox permission, and idempotency.
+Connect Gmail/Microsoft message synchronization and the existing Neyvro follow-up module to a thread-aware reply workflow. The first safe action on any genuine reply is to stop incompatible automatic follow-up before another step can execute. Reading, drafting, and sending are separate permissions; this skill never sends automatically.
 
-## Behavior modes
+## Reply taxonomy
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
+Classify each inbound message into exactly one category:
 
-## Contract
+`INTERESTED`, `REQUEST_INFORMATION`, `NOT_NOW`, `OBJECTION`, `REFERRAL`, `WRONG_PERSON`, `NOT_INTERESTED`, `UNSUBSCRIBE`, `OUT_OF_OFFICE`, `MEETING_REQUEST`, or `UNKNOWN`.
 
-- Activation: Activate when classifying a prospect reply, drafting a response, or deciding whether follow-up must stop.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+Keep the raw message, thread ID, conversation ID, sender, received time, classifier confidence, evidence/span, and classification version. A duplicate webhook is idempotent. A message from the wrong email thread or tenant is not classified against the campaign.
+
+## Workflow
+
+1. Retrieve the authorized conversation and full thread context. Verify tenant ownership, mailbox provider, sender/recipient identity, thread ID, and campaign/follow-up association.
+2. Atomically mark the matching follow-up queue stopped or paused before classification-driven drafting. This guard runs for every genuine reply, including out-of-office and unknown replies.
+3. Classify the reply with structured evidence and confidence. Safety-critical `UNSUBSCRIBE` and explicit `NOT_INTERESTED` states immediately suppress future outreach and require no further automated contact.
+4. Return a suggested next action: human review, meeting proposal, information draft, referral routing, reminder after a stated out-of-office return date, objection response, or stop/suppress.
+5. Draft only after classification and human-review rules permit it. Objection responses acknowledge once, reframe briefly, and ask one next step; do not argue repeatedly. Meeting suggestions use only authorized sender availability and never invent times.
+6. Recheck follow-up stop state, suppression, thread, tenant, and approval immediately before any separately authorized send service could act.
+
+## Category actions
+
+- `INTERESTED` / `MEETING_REQUEST`: human review plus a concise meeting suggestion using available times or an approved booking link.
+- `REQUEST_INFORMATION`: provide one relevant approved resource, then one soft next-step question.
+- `OBJECTION`: acknowledge, address once with approved evidence, and offer one small next step.
+- `NOT_NOW`: record the requested timing as a reviewable reminder; do not continue the active cadence.
+- `REFERRAL` / `WRONG_PERSON`: thank the sender and request or route to the named responsible person, subject to authorization.
+- `NOT_INTERESTED` / `UNSUBSCRIBE`: stop and suppress immediately; no draft is required for unsubscribe.
+- `OUT_OF_OFFICE`: stop the active cadence and retain only the provider-return date/alternate that is explicitly present.
+- `UNKNOWN`: stop incompatible automation and require human review; never guess intent.
+
+## Structured output
+
+```json
+{
+  "conversation_id": "conv-1",
+  "thread_id": "thread-1",
+  "reply_id": "msg-9",
+  "category": "INTERESTED",
+  "confidence": 0.94,
+  "classification_evidence": [{"span": "yes, Thursday works", "source": "msg-9"}],
+  "followup_stop": {"required": true, "status": "stopped", "reason": "reply_detected"},
+  "suppression": {"required": false, "status": "unchanged"},
+  "suggested_next_action": "human_review_meeting_times",
+  "draft": null,
+  "approval_status": "review_required",
+  "send_allowed": false
+}
+```
+
+## MCP contracts and permissions
+
+- `neyvro_get_conversation` — read tenant-scoped Gmail/Microsoft conversation and thread context.
+- `neyvro_get_reply_status` — read classification, stop state, suppression, and processing/idempotency state.
+- `neyvro_classify_reply` — classify an authorized inbound reply and apply the stop-on-reply guard.
+- `neyvro_draft_reply` — create a human-reviewable objection or meeting response; no send.
+- `neyvro_get_followup_queue` — read the current follow-up queue and stopped/paused tasks.
+
+Read contracts require `intelligence:read`; classification/queue stop and draft persistence require the appropriate proposal/follow-up permission; sending belongs to a separate `messages:send` service with explicit approval, mailbox permission, and idempotency key. If Gmail/Microsoft sync or follow-up persistence is unavailable, return `disabled`/`blocked` and do not fabricate a message or stop confirmation.
+
+See also: `cold-email-writing` for copy, `multichannel-sequences` for stop rules, and `discovery-and-qualification` for next-step questions.
 
 ---
 

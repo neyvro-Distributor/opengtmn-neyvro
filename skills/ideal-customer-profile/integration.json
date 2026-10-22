@@ -1,0 +1,12 @@
+{
+  "skill": "ideal-customer-profile",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "contracts": [
+    {"name": "neyvro_get_icp", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]},
+    {"name": "neyvro_evaluate_icp_fit", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]},
+    {"name": "neyvro_propose_icp_changes", "operation": "proposal", "required_scopes": ["proposals:write"], "approval_required": true, "output_status": ["proposed", "disabled", "blocked"]}
+  ],
+  "authorization": "Customer-approved ICP settings are immutable through this skill; changes require an explicit authorized proposal and approval."
+}

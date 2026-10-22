@@ -1,0 +1,15 @@
+{
+  "skill": "linkedin-outreach",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "assisted_workflow_only": true,
+  "contracts": [
+    {"name": "neyvro_get_linkedin_prospect_context", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked", "not_found"]},
+    {"name": "neyvro_draft_linkedin_message", "operation": "draft", "required_scopes": ["intelligence:read", "proposals:write"], "approval_required": true, "output_status": ["draft_ready", "needs_evidence", "unsupported", "disabled"]},
+    {"name": "neyvro_get_social_relationship", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked", "not_found"]},
+    {"name": "neyvro_record_manual_outreach", "operation": "record", "required_scopes": ["proposals:write"], "approval_required": true, "output_status": ["recorded", "blocked", "disabled", "not_found"]}
+  ],
+  "unsupported": ["scraping", "browser automation", "cookie/session-token use", "automated connection requests", "automated DMs", "automated comments or reactions", "bulk outreach"],
+  "authorization": "Only customer-confirmed manual actions may be recorded; no LinkedIn action is executed by this integration."
+}

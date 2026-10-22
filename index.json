@@ -7,9 +7,9 @@
   "skills": [
     {
       "name": "account-research",
-      "description": "Activate when researching a specific company or person before an authorized GTM decision, draft, or investigation.",
-      "version": "0.1.0",
-      "maturity": "contract",
+      "description": "Activate when researching a specific company or authorized buyer for a GTM decision, outreach draft, qualification review, or investigation; use existing Neyvro company-twin evidence before requesting new research.",
+      "version": "0.2.0",
+      "maturity": "playbook",
       "mode": "research",
       "required_scopes": [
         "intelligence:read"
@@ -17,7 +17,8 @@
       "related_skills": [
         "ideal-customer-profile",
         "evidence",
-        "outreach-personalization"
+        "outreach-personalization",
+        "buyer-matching"
       ],
       "path": "account-research/SKILL.md"
     },
@@ -56,9 +57,9 @@
     },
     {
       "name": "cold-email-writing",
-      "description": "Activate when drafting or reviewing a personalized cold email or short sequence from authorized evidence.",
-      "version": "0.1.0",
-      "maturity": "contract",
+      "description": "Activate when drafting or reviewing an evidence-grounded outbound email from an authorized opportunity, buyer, product, positioning, channel, and tone; this skill never sends messages.",
+      "version": "0.2.0",
+      "maturity": "playbook",
       "mode": "draft",
       "required_scopes": [
         "intelligence:read",
@@ -67,7 +68,8 @@
       "related_skills": [
         "account-research",
         "outreach-personalization",
-        "email-deliverability"
+        "email-deliverability",
+        "multichannel-sequences"
       ],
       "path": "cold-email-writing/SKILL.md"
     },
@@ -154,9 +156,9 @@
     },
     {
       "name": "email-deliverability",
-      "description": "Activate when assessing sending-domain readiness, authentication, reputation, pacing, bounce, or complaint risk.",
-      "version": "0.1.0",
-      "maturity": "contract",
+      "description": "Activate when assessing authorized Gmail or Microsoft mailbox readiness, SPF/DKIM/DMARC configuration, sender limits, bounce or complaint risk, recipient hygiene, or safe email ramp-up; never change DNS or send mail.",
+      "version": "0.2.0",
+      "maturity": "playbook",
       "mode": "research",
       "required_scopes": [
         "intelligence:read"
@@ -238,25 +240,28 @@
     },
     {
       "name": "ideal-customer-profile",
-      "description": "Activate when defining, refining, scoring, or reviewing an ideal customer profile, buyer roles, triggers, or anti-ICP.",
-      "version": "0.1.0",
-      "maturity": "contract",
+      "description": "Activate when defining, refining, scoring, or reviewing an ICP, buyer personas, target-account filters, trigger events, or anti-ICP rules.",
+      "version": "0.2.0",
+      "maturity": "playbook",
       "mode": "research",
       "required_scopes": [
-        "intelligence:read"
+        "intelligence:read",
+        "proposals:write"
       ],
       "related_skills": [
         "gtm-strategy",
         "account-research",
-        "buyer-matching"
+        "evidence",
+        "buyer-matching",
+        "company-changes"
       ],
       "path": "ideal-customer-profile/SKILL.md"
     },
     {
       "name": "lead-sourcing-and-enrichment",
-      "description": "Activate when finding or enriching ICP-fit companies and contacts with verified, source-labeled data.",
-      "version": "0.1.0",
-      "maturity": "contract",
+      "description": "Activate when selecting ICP-fit accounts, finding buyer roles, or enriching authorized business contacts with deduplicated, provenance-labeled, verified data.",
+      "version": "0.2.0",
+      "maturity": "playbook",
       "mode": "research",
       "required_scopes": [
         "intelligence:read"
@@ -264,36 +269,44 @@
       "related_skills": [
         "ideal-customer-profile",
         "account-research",
-        "evidence"
+        "evidence",
+        "buyer-matching",
+        "email-deliverability"
       ],
       "path": "lead-sourcing-and-enrichment/SKILL.md"
     },
     {
       "name": "linkedin-outreach",
-      "description": "Activate when planning or reviewing compliant LinkedIn prospecting and relationship outreach.",
-      "version": "0.1.0",
-      "maturity": "contract",
-      "mode": "knowledge",
-      "required_scopes": [],
+      "description": "Activate when researching an authorized professional profile, selecting a relevant LinkedIn outreach angle, drafting a connection note or direct message, or recording customer-confirmed manual outreach; never automate LinkedIn actions.",
+      "version": "0.2.0",
+      "maturity": "playbook",
+      "mode": "draft",
+      "required_scopes": [
+        "intelligence:read",
+        "proposals:write"
+      ],
       "related_skills": [
         "account-research",
         "outreach-personalization",
-        "multichannel-sequences"
+        "multichannel-sequences",
+        "cold-email-writing"
       ],
       "path": "linkedin-outreach/SKILL.md"
     },
     {
       "name": "multichannel-sequences",
-      "description": "Activate when designing, reviewing, or operating a multi-step outreach cadence with explicit branch and stop logic.",
-      "version": "0.1.0",
-      "maturity": "contract",
+      "description": "Activate when designing, reviewing, compiling, or operating a customer-approved multichannel outreach sequence with deterministic timing, branches, eligibility checks, and stop rules.",
+      "version": "0.2.0",
+      "maturity": "playbook",
       "mode": "draft",
       "required_scopes": [
+        "intelligence:read",
         "proposals:write"
       ],
       "related_skills": [
         "cold-email-writing",
         "linkedin-outreach",
+        "email-deliverability",
         "reply-handling-and-objections"
       ],
       "path": "multichannel-sequences/SKILL.md"
@@ -333,9 +346,9 @@
     },
     {
       "name": "outreach-personalization",
-      "description": "Activate when converting verified company or buyer evidence into relevant, non-creepy outreach personalization.",
-      "version": "0.1.0",
-      "maturity": "contract",
+      "description": "Activate when turning authorized company, buyer, opportunity, positioning, and brand-voice context into evidence-linked personalization snippets at strategic, qualified, or lightweight effort levels; never send messages.",
+      "version": "0.2.0",
+      "maturity": "playbook",
       "mode": "draft",
       "required_scopes": [
         "intelligence:read",
@@ -344,22 +357,25 @@
       "related_skills": [
         "account-research",
         "cold-email-writing",
-        "evidence"
+        "linkedin-outreach",
+        "ideal-customer-profile"
       ],
       "path": "outreach-personalization/SKILL.md"
     },
     {
       "name": "positioning-and-messaging",
-      "description": "Activate when translating a product's differentiated value into positioning, message houses, or evidence-backed outreach angles.",
-      "version": "0.1.0",
-      "maturity": "contract",
+      "description": "Activate when developing, reviewing, or refining product positioning, value propositions, battlecards, buyer messaging, or approved message-house claims.",
+      "version": "0.2.0",
+      "maturity": "playbook",
       "mode": "draft",
       "required_scopes": [
-        "intelligence:read"
+        "intelligence:read",
+        "proposals:write"
       ],
       "related_skills": [
         "gtm-strategy",
         "ideal-customer-profile",
+        "account-research",
         "cold-email-writing"
       ],
       "path": "positioning-and-messaging/SKILL.md"
@@ -383,9 +399,9 @@
     },
     {
       "name": "reply-handling-and-objections",
-      "description": "Activate when classifying a prospect reply, drafting a response, or deciding whether follow-up must stop.",
-      "version": "0.1.0",
-      "maturity": "contract",
+      "description": "Activate when retrieving and classifying an authorized email reply, drafting an objection-aware response, or stopping follow-up after a reply, rejection, unsubscribe, meeting, or out-of-office event.",
+      "version": "0.2.0",
+      "maturity": "playbook",
       "mode": "research",
       "required_scopes": [
         "intelligence:read",
@@ -393,8 +409,8 @@
       ],
       "related_skills": [
         "cold-email-writing",
-        "discovery-and-qualification",
-        "multichannel-sequences"
+        "multichannel-sequences",
+        "discovery-and-qualification"
       ],
       "path": "reply-handling-and-objections/SKILL.md"
     },

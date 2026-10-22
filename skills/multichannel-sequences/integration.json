@@ -1,0 +1,15 @@
+{
+  "skill": "multichannel-sequences",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "declarative_only": true,
+  "contracts": [
+    {"name": "neyvro_create_campaign_draft", "operation": "draft", "required_scopes": ["intelligence:read", "proposals:write"], "approval_required": false, "output_status": ["draft", "invalid", "disabled", "blocked"]},
+    {"name": "neyvro_propose_campaign", "operation": "proposal", "required_scopes": ["proposals:write"], "approval_required": true, "output_status": ["proposed", "pending_approval", "disabled", "blocked"]},
+    {"name": "neyvro_get_campaign", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "not_found", "disabled", "blocked"]},
+    {"name": "neyvro_pause_campaign", "operation": "pause", "required_scopes": ["proposals:write"], "approval_required": true, "output_status": ["paused", "blocked", "disabled"]},
+    {"name": "neyvro_get_campaign_status", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]}
+  ],
+  "authorization": "This skill compiles and plans only. Actual sending and live scheduling require the existing separately authorized campaign/follow-up backend, approval, provider permission, and idempotency."
+}

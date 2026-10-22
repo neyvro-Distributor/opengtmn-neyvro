@@ -1,0 +1,13 @@
+{
+  "skill": "positioning-and-messaging",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "contracts": [
+    {"name": "neyvro_get_product_context", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]},
+    {"name": "neyvro_get_positioning", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]},
+    {"name": "neyvro_propose_positioning", "operation": "proposal", "required_scopes": ["proposals:write"], "approval_required": true, "output_status": ["proposed", "disabled", "blocked"]},
+    {"name": "neyvro_get_approved_claims", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]}
+  ],
+  "authorization": "Approved positioning and claims are versioned and immutable through this skill; changes require an explicit authorized proposal and approval."
+}

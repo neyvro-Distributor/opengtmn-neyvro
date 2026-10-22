@@ -1,0 +1,16 @@
+{
+  "skill": "reply-handling-and-objections",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "send_supported": false,
+  "contracts": [
+    {"name": "neyvro_get_conversation", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "not_found", "disabled", "blocked"]},
+    {"name": "neyvro_get_reply_status", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "not_found", "disabled", "blocked"]},
+    {"name": "neyvro_classify_reply", "operation": "classify_and_stop", "required_scopes": ["intelligence:read", "proposals:write"], "approval_required": false, "output_status": ["classified", "duplicate", "wrong_thread", "disabled", "blocked"]},
+    {"name": "neyvro_draft_reply", "operation": "draft", "required_scopes": ["intelligence:read", "proposals:write"], "approval_required": true, "output_status": ["draft_ready", "review_required", "blocked", "disabled"]},
+    {"name": "neyvro_get_followup_queue", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]}
+  ],
+  "send_boundary": "Sending requires a separate messages:send service, explicit approval, authorized Gmail/Microsoft mailbox, and idempotency key.",
+  "authorization": "Unsubscribe and explicit rejection are safety-critical and must stop/suppress before any later follow-up dispatch."
+}

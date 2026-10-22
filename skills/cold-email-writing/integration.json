@@ -1,0 +1,13 @@
+{
+  "skill": "cold-email-writing",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "draft_only": true,
+  "contracts": [
+    {"name": "neyvro_draft_email", "operation": "draft", "required_scopes": ["intelligence:read", "proposals:write"], "approval_required": true, "output_status": ["draft_ready", "needs_evidence", "blocked", "disabled"]},
+    {"name": "neyvro_check_message_claims", "operation": "validate", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["valid", "flagged", "blocked", "disabled"]},
+    {"name": "neyvro_get_email_draft", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "not_found", "disabled", "blocked"]}
+  ],
+  "authorization": "This skill never sends messages. Draft storage and follow-up review are allowed only through an authorized adapter; send requires a separate approved action and mailbox permission."
+}

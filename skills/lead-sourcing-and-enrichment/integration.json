@@ -1,0 +1,14 @@
+{
+  "skill": "lead-sourcing-and-enrichment",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "contracts": [
+    {"name": "neyvro_search_buyers", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]},
+    {"name": "neyvro_get_opportunity_buyers", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]},
+    {"name": "neyvro_enrich_contact", "operation": "enrichment", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]},
+    {"name": "neyvro_get_contact_verification", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]}
+  ],
+  "provider_setup": "Configure an approved B2B provider adapter, tenant entitlement, API credential reference, permitted-use policy, freshness window, and usage/rate-limit budget. Credentials are never stored in skill files.",
+  "authorization": "Existing customers, active opportunities, opt-outs, and suppressed contacts are excluded unless a customer-approved exception is explicit and audited."
+}

@@ -91,13 +91,17 @@ def _read_skill(path: Path, root: Path) -> Skill:
         raise SkillValidationError(f"{path}: name must be lowercase kebab-case")
     if len(description) > 1024:
         raise SkillValidationError(f"{path}: description exceeds 1024 characters")
-    version = str(data.get("version", "0.1.0"))
+    metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+    def field(name: str, default: Any = None) -> Any:
+        return data[name] if name in data else metadata.get(name, default)
+
+    version = str(field("version", "0.1.0"))
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise SkillValidationError(f"{path}: version must use semantic versioning")
-    maturity = str(data.get("maturity", "contract"))
+    maturity = str(field("maturity", "contract"))
     if maturity not in {"contract", "playbook", "verified"}:
         raise SkillValidationError(f"{path}: unsupported maturity {maturity!r}")
-    mode = str(data.get("mode", "knowledge"))
+    mode = str(field("mode", "knowledge"))
     if mode not in {"knowledge", "research", "draft", "execution"}:
         raise SkillValidationError(f"{path}: unsupported mode {mode!r}")
     relative = path.relative_to(root).as_posix()
@@ -107,8 +111,8 @@ def _read_skill(path: Path, root: Path) -> Skill:
         version=version,
         maturity=maturity,
         mode=mode,
-        required_scopes=_string_list(data.get("required_scopes"), "required_scopes", path),
-        related_skills=_string_list(data.get("related_skills"), "related_skills", path),
+        required_scopes=_string_list(field("required_scopes"), "required_scopes", path),
+        related_skills=_string_list(field("related_skills"), "related_skills", path),
         path=relative,
         markdown=text,
     )
