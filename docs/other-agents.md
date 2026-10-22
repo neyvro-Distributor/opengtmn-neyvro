@@ -62,12 +62,11 @@ documented commands are:
 
 ```sh
 gemini skills link /absolute/path/to/opengtmn-neyvro-/skills
-gemini mcp add <server-name> https://__DEPLOYED_NEYVRO_MCP_HOST__/mcp --transport http
+gemini mcp add <server-name> https://opengtmn-neyvro.onrender.com/mcp --transport http
 gemini mcp list
 ```
 
-The command above intentionally uses a placeholder and must be changed to the
-real deployed URL before use. The checked-in JSON example uses `httpUrl`, which
+The command above uses the verified deployed URL. The checked-in JSON example uses `httpUrl`, which
 selects Streamable HTTP; `/mcp auth <server-name>` starts the client's OAuth flow
 when the deployment advertises OAuth. (The displayed command name is written
 without an underscore because Gemini reserves underscores in server aliases.)

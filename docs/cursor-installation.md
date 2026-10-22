@@ -35,9 +35,9 @@ Streamable HTTP server from its MCP/Tools settings. Use the deployed `/mcp`
 endpoint and complete interactive OAuth when Cursor presents it. No token is
 stored in this repository.
 
-`.cursor/mcp.json.example` is a setup example only. Replace
-`https://__DEPLOYED_NEYVRO_MCP_HOST__/mcp` only after Neyvro has a real HTTPS
-deployment; the repository currently has no deployed endpoint.
+`.cursor/mcp.json.example` points to the verified deployment:
+`https://opengtmn-neyvro.onrender.com/mcp`. The endpoint is publicly reachable,
+but customer-data access remains disabled until OAuth is configured.
 
 ## Local knowledge-only MCP
 
@@ -66,4 +66,5 @@ remote execution unavailable.
 
 Status in this repository: `DOCUMENTED_ONLY` for Cursor. The installed Cursor
 binary was detected, but a GUI plugin installation and authenticated remote
-call were not run in this headless workspace.
+call were not run in this headless workspace. Remote OAuth is currently blocked
+by the deployment configuration.

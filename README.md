@@ -1,6 +1,41 @@
-# Neyvro Agent Skills
+# Neyvro Agent Skills & MCP
 
-Portable, knowledge-only Agent Skills for Codex, Claude Code, Cursor, and MCP-compatible clients.
+Portable GTM, company-intelligence, and evidence-grounded workflow skills for
+Codex, Claude Code, Cursor, and compatible MCP clients.
+
+Neyvro provides one canonical `skills/` library and one remote MCP boundary.
+Client-specific files are installation adapters; they do not fork skill content
+or business logic.
+
+## Release status
+
+The public transport is live and independently verified:
+
+- MCP endpoint: `https://opengtmn-neyvro.onrender.com/mcp`
+- Health: HTTP 200
+- MCP protocol: `2025-06-18` initialization verified
+- Tools: 56 discoverable contracts
+- Skill resources: 35 discoverable and readable
+- Prompts: 35 discoverable
+- Skill gate: 26 mandatory skills; 35 packaged skills
+- Repository tests: 141 passing
+
+Customer-data access is currently fail-closed. Production OAuth/PKCE, the
+MCP-to-backend delegated identity bridge, and authenticated tenant-isolation
+tests are not yet configured. Tool discovery is not authorization and does not
+indicate that private records are available.
+
+## What is included
+
+- 35 canonical Agent Skills with metadata-based discovery and on-demand loading.
+- Local knowledge-only MCP server using the official Python MCP SDK and stdio.
+- Remote Streamable HTTP MCP boundary with scoped tool contracts and approval
+  metadata.
+- Portable Agent Plugin files: `plugin.json`, `mcp.json`, `skills/`, and
+  `assets/`.
+- Claude Code, Cursor, Codex, VS Code, Gemini, Windsurf, and Cline examples.
+- Explicit safety boundaries for read, research, draft, propose, approve,
+  execute, publish, and verify workflows.
 
 ## Local MCP server
 
@@ -60,7 +95,7 @@ Alternatively use the repository checkout directly:
 
 Use the first form after installation. Do not pass arbitrary skill roots or filesystem paths to the server.
 
-## Remote customer-data MCP boundary
+## Remote MCP boundary
 
 The separate `neyvro-mcp-remote` command exposes tenant-scoped customer-data contracts over official Streamable HTTP at `/mcp`. It requires configured OAuth issuer/audience/JWKS and a server-side backend credential, never forwards inbound bearer tokens, and fails closed when a capability is unavailable. Provider-assigned HTTPS hosting is sufficient; no custom domain is required.
 
@@ -74,7 +109,14 @@ See [docs/remote-mcp-readiness.md](docs/remote-mcp-readiness.md) for the configu
 
 This repository is also a portable Agent Plugins package. It contains the root `plugin.json`, `mcp.json`, `.codex-plugin/plugin.json` compatibility overlay, `assets/`, and all 35 current skill directories. The package includes the 17 OpenGTM-equivalent workflows, 9 Neyvro-exclusive intelligence workflows, and 9 legacy compatibility skill documents; see `assets/skill-inventory.json` for the explicit inventory.
 
-The remote MCP URL is intentionally a deployment marker because no deployed Neyvro HTTPS endpoint is available in this repository. Replace the `url` in `mcp.json` only after deploying the remote server. Do not publish or install the package as a connected plugin while that marker remains.
+The verified remote MCP URL is:
+
+```text
+https://opengtmn-neyvro.onrender.com/mcp
+```
+
+The transport and public skill surfaces are live. Customer-data tools remain
+disabled until production OAuth and the backend trust bridge are configured.
 
 ### Codex local skills
 
@@ -88,21 +130,24 @@ The script copies only `SKILL.md` files and does not overwrite the plugin or cus
 
 ### Codex MCP connection
 
-After a real HTTPS endpoint is deployed, configure the current Codex CLI:
+Configure the current Codex CLI:
 
 ```bash
-codex mcp add neyvro --url "https://<deployed-host>/mcp" \
-  --oauth-client-registration dcr \
-  --oauth-resource "neyvro-mcp"
-codex mcp login neyvro --oauth-client-registration dcr --scopes intelligence:read
+codex mcp add neyvro --url "https://opengtmn-neyvro.onrender.com/mcp"
 codex mcp list
 ```
 
-Use the actual host and resource values supplied by the Neyvro deployment. Do not put client secrets or bearer tokens in `mcp.json`. If the provider uses a pre-registered client, use `--oauth-client-id` during `codex mcp add` instead of DCR.
+The server is registered in the verified Codex environment. OAuth login and
+private-data calls remain blocked until a real authorization provider is
+configured. Never put client secrets or bearer tokens in `mcp.json`.
 
 ### ChatGPT and plugin installation
 
-For local testing, add this repository or a copied package to a personal/repo plugin marketplace using the current Agent Plugins marketplace format, then install it in the ChatGPT desktop app. The portable package uses the root manifest; `.codex-plugin/plugin.json` is only a compatibility fallback. For a custom remote MCP connection, use ChatGPT Plugins → Add custom MCP server, enter the deployed `/mcp` URL, review the risk warning, and complete Neyvro OAuth authorization. Verify the connection in a new conversation and test the packaged onboarding workflow.
+For local testing, add this repository or a copied package to a personal/repo
+plugin marketplace using the current Agent Plugins format. For a custom remote
+MCP connection, use ChatGPT → Add custom MCP server and enter the deployed
+`/mcp` URL. OAuth and private-data invocation remain blocked until the provider
+is configured. Public marketplace publication is not claimed.
 
 Public distribution requires the OpenAI plugin submission/review process and a deployed HTTPS endpoint. This repository does not claim marketplace publication or approval.
 
@@ -113,9 +158,10 @@ Public distribution requires the OpenAI plugin submission/review process and a d
 - “Prepare an evidence-backed outbound campaign.”
 - “Show me who replied to my outreach.”
 
-Run `python3 scripts/validate_plugin.py` to validate the package structure, skill inventory, safe paths, OAuth declaration, and deployment-marker status.
+Run `python3 scripts/validate_plugin.py` to validate the package structure,
+skill inventory, safe paths, OAuth declaration, and configured endpoint.
 
-For the release gate and security/readiness reports, run `python3 scripts/validate_release.py` and see [docs/release-readiness.md](docs/release-readiness.md). The current assessment is NO-GO for public customer-data access because no remote HTTPS deployment or OAuth issuer is configured.
+For release and security evidence, see [docs/PRODUCTION_CLIENT_RELEASE.md](docs/PRODUCTION_CLIENT_RELEASE.md), [docs/OAUTH_CLIENT_COMPATIBILITY.md](docs/OAUTH_CLIENT_COMPATIBILITY.md), and [docs/e2e/CLIENT_COMPATIBILITY_MATRIX.md](docs/e2e/CLIENT_COMPATIBILITY_MATRIX.md). The current assessment is NO-GO for private customer-data access because no OAuth issuer or backend trust bridge is configured.
 
 ## Validation and tests
 

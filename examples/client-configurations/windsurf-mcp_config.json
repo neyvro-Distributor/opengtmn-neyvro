@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "neyvro": {
-      "serverUrl": "https://__DEPLOYED_NEYVRO_MCP_HOST__/mcp"
+      "serverUrl": "https://opengtmn-neyvro.onrender.com/mcp"
     }
   }
 }

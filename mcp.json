@@ -3,7 +3,7 @@
   "mcpServers": {
     "neyvro": {
       "type": "streamable-http",
-      "url": "https://__DEPLOYED_NEYVRO_MCP_HOST__/mcp",
+      "url": "https://opengtmn-neyvro.onrender.com/mcp",
       "extensions": {
         "com.openai": {
           "auth": {

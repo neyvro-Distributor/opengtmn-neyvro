@@ -54,17 +54,17 @@ The exact installed version is checked in this repository’s validation log; up
 
 ## Mode B — Remote Neyvro MCP
 
-No deployed Neyvro HTTPS MCP URL is present in this workspace. Do not substitute a fictional address. After deployment, set the real endpoint in your shell and add it to Claude Code:
+The verified Neyvro HTTPS MCP URL is:
 
 ```bash
-export NEYVRO_MCP_URL="https://<actual-provider-assigned-host>/mcp"
+export NEYVRO_MCP_URL="https://opengtmn-neyvro.onrender.com/mcp"
 claude mcp add --transport http --scope user neyvro "${NEYVRO_MCP_URL}"
 claude mcp login neyvro
 claude mcp list
 claude mcp get neyvro
 ```
 
-OAuth authorization is completed by Claude Code’s MCP login flow. Tokens are stored by Claude Code and are not placed in this repository. Use `/mcp` inside Claude Code to inspect the connection, authenticate, or clear authentication.
+OAuth authorization is currently unavailable on the deployment: the endpoint is live, but its OAuth issuer and protected-resource metadata are not configured. Do not claim an authenticated connection until the provider is configured. Tokens must never be placed in this repository.
 
 The Neyvro server is tenant-scoped. Research/read tools require the granted read scopes; proposal and external-action workflows require their own authorization and customer approval. A draft is never treated as sent, and no message is silently sent.
 

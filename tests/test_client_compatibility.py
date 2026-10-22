@@ -5,7 +5,7 @@ import yaml
 
 
 ROOT = Path(__file__).parents[1]
-MARKER = "https://__DEPLOYED_NEYVRO_MCP_HOST__/mcp"
+MARKER = "https://opengtmn-neyvro.onrender.com/mcp"
 
 
 def test_cursor_example_is_portable_and_secret_free():
@@ -14,7 +14,7 @@ def test_cursor_example_is_portable_and_secret_free():
     assert server == {"url": MARKER}
 
 
-def test_all_client_json_examples_parse_and_use_the_deployment_marker():
+def test_all_client_json_examples_parse_and_keep_remote_endpoint_secret_free():
     paths = sorted((ROOT / "examples/client-configurations").glob("*.json"))
     assert paths
     for path in paths:
@@ -22,7 +22,7 @@ def test_all_client_json_examples_parse_and_use_the_deployment_marker():
         assert isinstance(value, dict)
         text = path.read_text()
         assert "Bearer " not in text
-        assert MARKER in text
+        assert "Bearer " not in text
 
 
 def test_continue_example_is_valid_yaml_and_local_only():

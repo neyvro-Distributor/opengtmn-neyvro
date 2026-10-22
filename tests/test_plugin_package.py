@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).parents[1]
 
 
-def test_portable_plugin_validator_passes_with_explicit_deployment_blocker():
+def test_portable_plugin_validator_passes_with_configured_deployment():
     result = subprocess.run(
         [sys.executable, "scripts/validate_plugin.py"],
         cwd=ROOT,
@@ -17,7 +17,7 @@ def test_portable_plugin_validator_passes_with_explicit_deployment_blocker():
     )
     assert result.returncode == 0, result.stderr
     assert "35 skills" in result.stdout
-    assert "BLOCKED" in result.stdout
+    assert "configured endpoint present" in result.stdout
 
 
 def test_portable_manifest_and_mcp_config_use_supported_shapes():
