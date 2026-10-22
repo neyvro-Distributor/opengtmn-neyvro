@@ -1,0 +1,14 @@
+{
+  "skill": "seo-fundamentals",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "optional_module": true,
+  "contracts": [
+    {"name": "neyvro_analyze_website", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "partial", "blocked", "disabled"]},
+    {"name": "neyvro_get_seo_recommendations", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]},
+    {"name": "neyvro_propose_seo_changes", "operation": "proposal", "required_scopes": ["proposals:write"], "approval_required": true, "output_status": ["proposed", "unauthorized", "disabled", "blocked"]}
+  ],
+  "setup_requirements": ["explicit website authorization", "robots/rate-limit-aware crawler adapter", "optional authorized repository provider for reviewable PRs"],
+  "authorization": "SEO audits never merge, deploy, publish, or modify DNS. Repository changes require explicit repository authorization and human review."
+}

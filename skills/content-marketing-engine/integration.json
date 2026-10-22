@@ -1,0 +1,17 @@
+{
+  "skill": "content-marketing-engine",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "optional_module": true,
+  "contracts": [
+    {"name": "neyvro_generate_content_ideas", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "partial", "blocked", "disabled"]},
+    {"name": "neyvro_create_content_brief", "operation": "draft", "required_scopes": ["content:draft"], "approval_required": false, "output_status": ["drafted", "blocked", "disabled"]},
+    {"name": "neyvro_draft_content", "operation": "draft", "required_scopes": ["content:draft"], "approval_required": false, "output_status": ["drafted", "needs_review", "blocked", "disabled"]},
+    {"name": "neyvro_get_content_calendar", "operation": "read", "required_scopes": ["content:read"], "approval_required": false, "output_status": ["available", "partial", "blocked", "disabled"]},
+    {"name": "neyvro_propose_social_post", "operation": "proposal", "required_scopes": ["content:publish"], "approval_required": true, "output_status": ["proposed", "unsupported", "unauthorized", "duplicate", "disabled"]}
+  ],
+  "supported_channels": ["website_blog", "x", "reddit", "linkedin_assisted", "substack", "authorized_api"],
+  "setup_requirements": ["customer positioning and approved claims", "brand voice context", "authorized channel adapter", "explicit approval for each external publication", "publication idempotency and outcome tracking"],
+  "authorization": "Drafting never publishes; external publication requires an authorized provider, current approval, permission recheck, and audit record."
+}

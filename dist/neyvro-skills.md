@@ -279,35 +279,89 @@ Research uses authorized monitoring and public-source evidence. Alerts or outrea
 
 ---
 
-<!-- content-marketing-engine/SKILL.md version 0.1.0 -->
+<!-- content-marketing-engine/SKILL.md version 0.2.0 -->
 
 ---
 name: content-marketing-engine
-description: Activate when planning buyer-question content, repurposing, distribution, or editorial measurement.
-version: 0.1.0
-maturity: contract
-mode: knowledge
-required_scopes: []
-related_skills: ["positioning-and-messaging","seo-fundamentals","generative-engine-optimization"]
+description: Activate when planning, drafting, repurposing, distributing, or measuring customer content from verified buyer questions, positioning, research, and approved brand voice; publishing always requires an authorized channel and explicit approval.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: draft
+  required_scopes: ["intelligence:read", "content:draft"]
+  related_skills: ["positioning-and-messaging", "seo-fundamentals", "generative-engine-optimization", "evidence"]
 ---
 
-# content marketing engine
+# Content marketing engine
 
-Explain topic selection, formats, cadence, and community norms. Neyvro has no content/social publishing backend; drafts are plans only.
+Build a sustainable, evidence-grounded content system that turns real buyer questions into useful content, then plans responsible distribution and measurement. Use Neyvro positioning, account research, product context, approved claims, and brand voice when available. This optional module does not require Neyvro login for knowledge-only planning or drafting from supplied inputs.
 
-## Behavior modes
+## Operating modes
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
+- **Knowledge-only:** Explain content strategy, formats, topic clusters, channel norms, and measurement concepts without external calls or side effects.
+- **Research:** Read authorized customer positioning, product, buyer, evidence, calendar, and outcome context. Return source IDs, freshness, confidence, assumptions, and gaps.
+- **Draft-only:** Create topic ideas, briefs, articles, social adaptations, newsletters, and repurposing plans. Do not publish, schedule, or mutate a calendar.
+- **External action:** Use only an explicitly authorized channel adapter, required scope, current approval, idempotency key, and audit record. If any condition is missing, return a proposal or blocked result.
 
-## Contract
+## Workflow
 
-- Activation: Activate when planning buyer-question content, repurposing, distribution, or editorial measurement.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+1. Start with ICP buyer questions, sales or support language, approved positioning, product capabilities, and observed research gaps—not generic trends or invented demand.
+2. Map each idea to audience, buyer stage, problem, format, evidence, intended outcome, and a topic cluster. Prefer a pillar asset with supporting pieces and a create-once-distribute-many plan.
+3. Create an editorial brief before drafting: working title, question, audience, angle, outline, claims to verify, sources, CTA, brand voice, channel adaptations, owner, due date, and success measure.
+4. Draft only supported claims. Mark unsupported claims for research or approval; never invent testimonials, customer results, audience engagement, publication status, or product capabilities.
+5. Adapt for channel norms: useful professional insight on LinkedIn, give-first and disclosed participation on Reddit, concise opinion or threads on X, and deeper owned material in a website/blog or Substack. Never astroturf, seed repetitive promotion, buy engagement, or mass-post irrelevant content.
+6. Reuse approved long-form material into shorter formats while preserving meaning, citations, caveats, and claim provenance. A derivative must not introduce a stronger claim than its source.
+7. Measure only available observations. Separate observed engagement, subscribers, traffic, conversions, pipeline influence, and publication outcomes from unavailable or attributed metrics. Never infer a result from a draft or planned post.
+
+## Content lifecycle
+
+Every item has exactly one lifecycle state:
+
+`DRAFT` -> `READY_FOR_REVIEW` -> `APPROVED` -> `SCHEDULED` -> `PUBLISHED`, with `FAILED` for an unsuccessful authorized operation. A draft or proposal cannot be represented as published. Missing approval, unsupported channel, stale claims, duplicate publication, or revoked permission blocks the transition.
+
+## Required structured output
+
+Return a reviewable object containing:
+
+```json
+{
+  "ideas": [],
+  "brief": null,
+  "draft": null,
+  "calendar": [],
+  "repurposing": [],
+  "distribution": [],
+  "claim_review": {"supported": [], "needs_verification": [], "unsupported": []},
+  "brand_voice": {"version": null, "status": "unknown"},
+  "measurement": {"observed": [], "unavailable": [], "attribution_limits": []},
+  "state": "DRAFT",
+  "approval_required": true,
+  "external_action_executed": false
+}
+```
+
+Each claim has a source or is labeled `generic_product_messaging`. Each channel has authorization status, required permission, and whether publishing is supported. Calendar entries use deterministic IDs and reject duplicate publication keys.
+
+## MCP contracts
+
+- `neyvro_generate_content_ideas` — read customer context and produce evidence-linked ideas.
+- `neyvro_create_content_brief` — create a reviewable brief without publishing.
+- `neyvro_draft_content` — create or retrieve draft content with claim and voice checks.
+- `neyvro_get_content_calendar` — read the authorized content calendar and publication history.
+- `neyvro_propose_social_post` — create a social-post proposal; execution requires a separately authorized provider and approval.
+
+These contracts are disabled without adapters. Supported adapters may include an authorized customer website/blog, X, Reddit, LinkedIn-assisted publishing, Substack, or other approved APIs. Unsupported channels are reported as unsupported; no browser automation or scraping is substituted.
+
+## Safety and approval
+
+- Publishing is never implied by drafting, approval is versioned, and the customer must explicitly approve the exact content, channel, audience, timing, and material claims.
+- Recheck channel permission, recipient/community rules, suppression or opt-out constraints, duplicate publication key, and approval immediately before dispatch.
+- Do not publish repetitive promotional community content. Respect platform rules, rate limits, disclosure requirements, robots/access controls, and customer brand voice.
+- Never auto-merge, deploy, or silently change a website or repository. Repository or website changes are reviewable proposals only unless an authorized provider explicitly supports the approved operation.
+- If a result cannot be verified, say `unknown` or `unavailable` and provide the research needed.
+
+See `positioning-and-messaging` for approved product claims, `seo-fundamentals` and `generative-engine-optimization` for discoverability, and `evidence` for provenance.
 
 ---
 
@@ -375,35 +429,77 @@ Research requires Neyvro company, investigation, and evidence services. A twin i
 
 ---
 
-<!-- discovery-and-qualification/SKILL.md version 0.1.0 -->
+<!-- discovery-and-qualification/SKILL.md version 0.2.0 -->
 
 ---
 name: discovery-and-qualification
-description: Activate when evaluating whether a company or contact is a qualified opportunity and preparing discovery questions.
-version: 0.1.0
-maturity: contract
-mode: research
-required_scopes: ["intelligence:read"]
-related_skills: ["ideal-customer-profile","buyer-matching","predictive-problems"]
+description: Activate when qualifying an authorized sales opportunity or preparing a discovery-call brief using evidence, buyer research, conversation context, CRM records, and meeting history; never qualify from AI inference alone.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read"]
+  related_skills: ["ideal-customer-profile", "buyer-matching", "predictive-problems", "reply-handling-and-objections"]
 ---
 
-# discovery and qualification
+# Discovery and qualification
 
-Research may read authorized company, buyer, investigation, and pipeline context. Unknown is a valid result and must not become a positive score.
+Prepare an evidence-backed account briefing and discovery plan. Use BANT for a fast first pass, MEDDIC for complex opportunities, and MEDDPICC when paper process and competition materially affect the deal. Framework fields are lenses for questions, not permission to infer budget, authority, need, timing, or purchase intent.
 
-## Behavior modes
+## Qualification workflow
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
+1. Retrieve the opportunity, authorized company/buyer context, conversation thread, meeting history, existing CRM record, and opportunity evidence. Preserve tenant scope and source timestamps.
+2. Separate `confirmed_facts`, `inferences`, `qualification_gaps`, and `conflicting_information`. Only verified, attributable evidence can populate confirmed facts.
+3. Map the buying committee: economic buyer, champion, users, technical evaluator, procurement/legal, approver, and blockers. A title or AI guess is a stakeholder hypothesis until verified.
+4. Assess pain severity and cost of inaction from the buyer’s own words or evidence. Treat an inferred pain as a discovery question, not a qualification fact.
+5. Assess budget, timing, decision criteria/process, competition, and paper process only when explicitly supported. Never invent a budget, purchase timeline, authority, or commitment.
+6. Apply disqualification rules: explicit no need, out-of-scope/anti-ICP, no permitted buyer path, suppression/opt-out, duplicate or wrong opportunity, or a customer-confirmed blocker. Record the evidence and do not override it with a predicted score.
+7. Produce the brief, recommended questions, relevant objections, and one suggested next step. If CRM or meeting APIs are absent, keep the brief read-only and list the exact missing context.
 
-## Contract
+## Framework lenses
 
-- Activation: Activate when evaluating whether a company or contact is a qualified opportunity and preparing discovery questions.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+- **BANT:** Budget, Authority, Need, Timeline. Unknown budget or timing stays unknown.
+- **MEDDIC:** Metrics, Economic buyer, Decision criteria, Decision process, Identify pain, Champion.
+- **MEDDPICC:** MEDDIC plus Paper process and Competition.
+
+Select one primary framework and show the evidence status for every dimension. Do not aggregate unknowns into a positive score. A deal can be `qualified` only when the required dimensions for the selected framework are explicitly evidenced, the buyer path is credible, and no disqualifier or unresolved contradiction remains.
+
+## Required output
+
+```json
+{
+  "opportunity_id": "opp-123",
+  "framework": "BANT|MEDDIC|MEDDPICC",
+  "status": "qualified|incomplete|needs_review|nonbuyer|disqualified",
+  "account_briefing": "...",
+  "confirmed_facts": [],
+  "qualification_dimensions": {"budget": {"status": "confirmed|unknown|conflicting", "evidence_ids": []}},
+  "qualification_gaps": [],
+  "conflicting_information": [],
+  "buying_committee": [],
+  "pain_severity": {"status": "confirmed|hypothesis|unknown", "evidence_ids": []},
+  "relevant_objections": [],
+  "recommended_discovery_questions": [],
+  "suggested_next_step": "...",
+  "research_gaps": [],
+  "approval_status": "read_only|review_required",
+  "send_allowed": false
+}
+```
+
+`confirmed_facts` and each dimension’s evidence IDs must be source-attributed. A qualification status is not a forecast, win probability, or authorization to send. Discovery questions should resolve the highest-value gap first and must not presuppose a problem, budget, or timeline.
+
+## MCP contracts
+
+- `neyvro_get_opportunity_qualification` — read the current opportunity, qualification fields, evidence, CRM stage, and disqualifiers.
+- `neyvro_generate_discovery_brief` — generate a versioned, read-only account briefing and question plan.
+- `neyvro_get_buying_committee` — read authorized stakeholders, responsibilities, influence, and evidence.
+- `neyvro_get_meeting_context` — read synchronized meeting notes, transcript summaries, and prior commitments when available.
+
+These are read/planning contracts. If CRM or meeting APIs are missing, return `disabled`/`unknown` fields and preserve knowledge-only discovery guidance. No contract changes CRM qualification or sends a message.
+
+See also: `ideal-customer-profile` for fit and disqualification, `buyer-matching` for roles, `account-research` for company evidence, and `reply-handling-and-objections` for conversation context.
 
 ---
 
@@ -522,35 +618,74 @@ Evidence must retain source, observed time, subject, extraction context, and cor
 
 ---
 
-<!-- generative-engine-optimization/SKILL.md version 0.1.0 -->
+<!-- generative-engine-optimization/SKILL.md version 0.2.0 -->
 
 ---
 name: generative-engine-optimization
-description: Activate when assessing or planning how a site or brand can be retrieved, quoted, and cited by AI answer engines.
-version: 0.1.0
-maturity: contract
-mode: knowledge
-required_scopes: []
-related_skills: ["seo-fundamentals","content-marketing-engine","evidence"]
+description: Activate when assessing or improving an authorized website’s discoverability, answer-first content, entity clarity, structured data, AI-crawler access, freshness, or measurement plan for AI answer engines; never promise citations or fabricate visibility.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read", "proposals:write"]
+  related_skills: ["seo-fundamentals", "content-marketing-engine", "evidence"]
 ---
 
-# generative engine optimization
+# Generative engine optimization (GEO / AEO)
 
-Explain crawl access, answer-first content, entity authority, and measurement limits. Live research and publishing are blocked without a Neyvro provider.
+Help customers improve the chance that authorized, useful content is retrieved, understood, and cited by AI answer engines. GEO is non-deterministic: a single prompt, model response, or checklist score is not a visibility measurement. This optional module never changes a site automatically.
 
-## Behavior modes
+## Evidence hierarchy
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
+Label recommendations by confidence:
 
-## Contract
+- **Empirically supported / high confidence:** allow relevant crawlers, remove accidental access blocks, make important content server-rendered and answer-first, cite authoritative sources, keep claims factual, and maintain entity consistency.
+- **Practical but directional:** self-contained answer blocks, clear headings, useful FAQs, named authors, visible dates, and relevant structured data improve parsing and user trust; citation lift is not guaranteed.
+- **Emerging or disputed:** `llms.txt`, prompt-specific rewrites, composite GEO scores, and tactics claiming direct citation lift. Recommend only as bounded experiments, never as guarantees.
 
-- Activation: Activate when assessing or planning how a site or brand can be retrieved, quoted, and cited by AI answer engines.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+## Audit workflow
+
+1. Confirm explicit website authorization and inspect AI/search crawler access, robots directives, WAF/edge responses, noindex/nosnippet directives, canonical URLs, and server-rendered content. A crawler restriction is an observed access issue, not a reason to invent visibility loss.
+2. Review answer-first content: direct answer near the top, self-contained quotable statements, primary-source citations, clear definitions, question/intent coverage, and factual grounding.
+3. Review structured data and entity consistency. Malformed schema, schema/text mismatch, conflicting organization names, stale descriptions, or inconsistent `sameAs`/canonical identity become findings with evidence.
+4. Review authority indicators and freshness: named experts, primary sources, transparent authorship, visible publish/modified dates, reputable third-party references, and content updates that are real—not fake date bumps.
+5. Recommend `llms.txt` only as an optional, emerging/disputed experiment. It must not outrank crawl access, useful content, authoritative sources, or ordinary SEO.
+6. Build a measurement plan using a locked prompt set, repeated runs per engine, mention/citation rate, source share, and baseline-vs-after comparison. If no authorized visibility provider is integrated, return measurements as unavailable.
+
+## Required output
+
+```json
+{
+  "status": "complete|partial|blocked|unknown",
+  "site": "https://example.com",
+  "access_findings": [],
+  "content_recommendations": [{"recommendation": "...", "evidence_level": "empirically_supported|directional|emerging_or_disputed", "priority": 1}],
+  "schema_findings": [],
+  "entity_consistency": [],
+  "authority_indicators": [],
+  "freshness_findings": [],
+  "llms_txt": {"status": "present|missing|unknown", "recommendation": "optional experiment", "citation_guarantee": false},
+  "visibility_measurements": {"status": "available|unavailable|conflicting", "provider": null, "data": null},
+  "measurement_plan": [],
+  "conflicting_findings": [],
+  "unknowns": [],
+  "repository_proposal": null,
+  "merge_or_deploy_executed": false
+}
+```
+
+Do not fabricate ChatGPT, Gemini, Claude, Perplexity, AI Overview, citation, mention, rank, or share-of-voice measurements. Do not claim `llms.txt` or schema markup guarantees citation. Every observation includes source and confidence; every recommendation states its evidence level.
+
+## MCP contracts
+
+- `neyvro_get_geo_audit` — read an authorized GEO audit and evidence.
+- `neyvro_get_ai_visibility_findings` — read provider-reported visibility findings, or return unavailable when no provider is integrated.
+- `neyvro_propose_geo_improvements` — create a reviewable repository PR/proposal when repository access is explicitly authorized.
+
+These contracts are optional and disabled without an adapter. Repository proposals never auto-merge, deploy, publish, or silently modify a website. SEO remains a separate optional module.
+
+See also: `seo-fundamentals` for classic technical SEO, `content-marketing-engine` for content planning, and `evidence` for provenance.
 
 ---
 
@@ -583,6 +718,96 @@ Use Neyvro's capability registry and approval flow; OpenGTM's documented Chronos
 - Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
 - Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
 - Related skills are discovery hints, not implicit context injection.
+
+---
+
+<!-- gtm-automation-with-neyvro/SKILL.md version 0.2.0 -->
+
+---
+name: gtm-automation-with-neyvro
+description: Activate when coordinating Neyvro knowledge skills with connected customer intelligence, research, drafting, campaign, mailbox, conversation, meeting, SEO/GEO, content, or analytics services; use capability discovery and approval gates before any external action.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: execution
+  required_scopes: ["intelligence:read"]
+  related_skills: ["gtm-strategy", "multichannel-sequences", "outbound-metrics-and-benchmarks", "evidence"]
+---
+
+# GTM automation with Neyvro
+
+This is Neyvro’s native bridge between portable knowledge skills and authorized Neyvro MCP services. It does not require Chronos accounts, Chronos APIs, or `geo_*` tools. A Markdown skill remains useful without an account; this bridge discovers whether Neyvro can supply live context or execute an explicitly approved operation.
+
+## Capability discovery
+
+Before using connected data or proposing execution, call the capability contracts and determine:
+
+- whether Neyvro is connected and authentication is valid;
+- which scopes are granted and which are required;
+- which services are implemented, unavailable, disabled, or blocked;
+- which Gmail, Microsoft, social, website, repository, CRM, or other accounts are connected;
+- which actions require customer approval and whether the exact approval is current;
+- the tenant, freshness, provider, rate-limit, and data-quality boundaries.
+
+Do not infer a connected account from a configured name, a skill description, or a documented tool. A service is available only when the server reports it available for the current tenant and scopes.
+
+## Skill-to-capability map
+
+Use metadata discovery first and load one exact skill on demand. The bridge map is maintained in `src/neyvro/gtm_automation.py`; it does not inject all skill documents into an agent request.
+
+| Capability group | Portable skills | Neyvro-native tools |
+|---|---|---|
+| Customer strategy and ICP | `gtm-strategy`, `ideal-customer-profile`, `positioning-and-messaging` | `neyvro_get_customer_context`, `neyvro_get_gtm_strategy`, `neyvro_get_icp`, `neyvro_evaluate_icp_fit`, `neyvro_get_product_context`, `neyvro_get_positioning`, `neyvro_get_approved_claims` |
+| Company research | `account-research`, `digital-twins`, `company-changes` | `neyvro_research_company`, `neyvro_get_company_twin`, `neyvro_get_company_signals`, `neyvro_get_company_timeline` |
+| Monitoring and evidence | `evidence`, `negative-evidence`, `continuous-investigation` | `neyvro_get_evidence`, `neyvro_get_company_signals`, `neyvro_get_company_timeline`, `neyvro_get_investigation_status` |
+| Predictive opportunities | `predictive-problems`, `buying-windows` | `neyvro_get_predictive_opportunities`, `neyvro_get_buying_windows`, `neyvro_get_opportunity_signals` |
+| Buyer discovery | `buyer-matching`, `lead-sourcing-and-enrichment`, `discovery-and-qualification` | `neyvro_search_buyers`, `neyvro_get_opportunity_buyers`, `neyvro_get_opportunity_qualification`, `neyvro_get_buying_committee` |
+| Contact enrichment | `lead-sourcing-and-enrichment` | `neyvro_enrich_contact`, `neyvro_get_contact_verification` |
+| Message personalization | `outreach-personalization`, `linkedin-outreach` | `neyvro_get_personalization_context`, `neyvro_generate_personalization`, `neyvro_get_brand_voice`, `neyvro_get_linkedin_prospect_context` |
+| Email drafting | `cold-email-writing`, `email-deliverability` | `neyvro_draft_email`, `neyvro_check_message_claims`, `neyvro_get_mailbox_health`, `neyvro_get_sender_limits` |
+| Campaign proposals | `multichannel-sequences`, `content-marketing-engine` | `neyvro_create_campaign_draft`, `neyvro_propose_campaign`, `neyvro_create_content_brief`, `neyvro_propose_social_post` |
+| Approved campaign execution | `multichannel-sequences`, `email-deliverability` | `neyvro_execute_approved_campaign`, `neyvro_get_campaign_status`, `neyvro_get_delivery_metrics` |
+| Conversation intelligence | `reply-handling-and-objections` | `neyvro_get_conversation`, `neyvro_get_reply_status`, `neyvro_classify_reply`, `neyvro_get_followup_queue` |
+| Meeting and pipeline intelligence | `discovery-and-qualification`, `revenue-attribution` | `neyvro_get_meeting_context`, `neyvro_get_opportunity_qualification`, `neyvro_get_pipeline_metrics`, `neyvro_get_revenue_attribution` |
+| SEO/GEO analysis | `seo-fundamentals`, `generative-engine-optimization` | `neyvro_analyze_website`, `neyvro_get_seo_recommendations`, `neyvro_get_geo_audit`, `neyvro_get_ai_visibility_findings` |
+| Content workflows | `content-marketing-engine` | `neyvro_generate_content_ideas`, `neyvro_create_content_brief`, `neyvro_draft_content`, `neyvro_get_content_calendar` |
+| Analytics and revenue learning | `outbound-metrics-and-benchmarks`, `revenue-attribution` | `neyvro_get_campaign_metrics`, `neyvro_get_pipeline_metrics`, `neyvro_get_revenue_attribution`, `neyvro_get_signal_performance` |
+
+The map is a routing contract, not proof that every service is currently implemented. The capability response must mark unavailable tools explicitly.
+
+## Operating pattern
+
+Coordinate work through:
+
+`RESEARCH -> PLAN -> DRAFT -> REVIEW -> APPROVE -> EXECUTE -> VERIFY -> LEARN`
+
+Knowledge-only work may stop after PLAN or DRAFT and remains useful while disconnected. Connected reads require valid authentication, tenant scope, and `intelligence:read`. Drafts and proposals never send, publish, schedule, change DNS, merge, deploy, or alter CRM state.
+
+External execution requires all of the following at the server boundary:
+
+1. a connected account and implemented service;
+2. valid authentication and required scopes;
+3. exact current approval for the action, content, recipients, channel, timing, and approval version;
+4. eligibility, suppression, deliverability, and idempotency checks;
+5. an audit record and post-action verification.
+
+If any gate fails, return `disconnected`, `invalid_auth`, `insufficient_scope`, `pending_approval`, `unavailable`, or `blocked`. Never imply that a draft was sent or a proposal was executed.
+
+## MCP contracts
+
+- `neyvro_get_capabilities` — discover tenant-scoped service implementation and action support.
+- `neyvro_get_connections` — discover connected accounts and provider health without exposing credentials.
+- `neyvro_get_permissions` — discover granted scopes and permission expiry.
+- `neyvro_get_approval_status` — verify an exact action’s current approval and version.
+
+These are read-only discovery contracts. Execution uses the separately authorized service contract named in the capability response; this skill never substitutes an undocumented or Chronos tool.
+
+## Disconnected behavior
+
+When no Neyvro account is available, continue with knowledge-only strategy, ICP, research planning, copy drafts, briefs, deterministic campaign specifications, SEO/GEO recommendations, and measurement definitions from user-supplied context. Label live records, connected-account facts, execution results, and performance measurements as unavailable.
+
+See the exact skill selected by metadata search for domain instructions; related skills are hints, not an instruction to load the entire library.
 
 ---
 
@@ -1333,35 +1558,91 @@ Separate absence, unknown, and contradiction. Never claim “not found” means 
 
 ---
 
-<!-- outbound-metrics-and-benchmarks/SKILL.md version 0.1.0 -->
+<!-- outbound-metrics-and-benchmarks/SKILL.md version 0.2.0 -->
 
 ---
 name: outbound-metrics-and-benchmarks
-description: Activate when measuring outreach funnels, setting denominators, comparing benchmarks, or diagnosing campaign health.
-version: 0.1.0
-maturity: contract
-mode: research
-required_scopes: ["intelligence:read"]
-related_skills: ["email-deliverability","multichannel-sequences","revenue-attribution"]
+description: Activate when analyzing outbound funnel performance, campaign health, attribution, or contextual benchmarks using Neyvro campaign, conversation, and CRM records; every metric must expose its numerator, denominator, time window, segment, and data limitations.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read"]
+  related_skills: ["cold-email-writing", "email-deliverability", "multichannel-sequences", "linkedin-outreach", "reply-handling-and-objections"]
 ---
 
-# outbound metrics and benchmarks
+# Outbound metrics and benchmarks
 
-Research may read authorized operations, mailbox, pipeline, and investigation metrics. Report denominators and data gaps; do not claim unsupported attribution.
+Measure the outbound funnel from sourced contacts through revenue using real, tenant-authorized Neyvro campaign, conversation, mailbox, opportunity, CRM, and cost records. Treat analytics as descriptive unless an experiment or valid causal design supports a stronger conclusion.
 
-## Behavior modes
+## Metric contract
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
+Every returned metric must include:
 
-## Contract
+```json
+{
+  "metric": "positive_reply_rate",
+  "numerator": 0,
+  "denominator": 0,
+  "rate": null,
+  "unit": "ratio",
+  "time_window": {"start": "...", "end": "..."},
+  "segment": {},
+  "sample_size": 0,
+  "status": "available|unavailable|insufficient_sample|inconsistent",
+  "definition": "unique positive human replies / unique delivered outreach attempts",
+  "source_event_ids": [],
+  "limitations": []
+}
+```
 
-- Activation: Activate when measuring outreach funnels, setting denominators, comparing benchmarks, or diagnosing campaign health.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+Use unique event or entity IDs. Do not count duplicate webhooks twice. A zero denominator yields `rate: null` and `status: unavailable`, never zero. A metric with missing CRM outcomes is unavailable or partial, not a fabricated zero.
+
+Canonical funnel definitions:
+
+- `contacts_found`: unique contacts discovered in the window.
+- `contact_verification_rate`: unique contacts with a verified status / unique contacts found.
+- `outreach_attempts`: unique authorized send attempts, grouped by campaign and channel.
+- `delivery_rate`: unique delivered attempts / unique outreach attempts.
+- `bounce_rate`: unique bounced attempts / unique outreach attempts; distinguish hard and soft bounce when available.
+- `reply_rate`: unique human replies / unique delivered attempts; exclude automatic replies when classification is available.
+- `positive_reply_rate`: unique positive human replies / unique delivered attempts; also report positive share of human replies separately.
+- `meetings_booked_rate`: unique meetings booked / unique outreach attempts, plus meetings / positive replies when possible.
+- `qualified_opportunity_rate`: unique qualified opportunities / unique outreach attempts; qualification requires CRM evidence, not inference alone.
+- `pipeline_value`: sum of authorized opportunity amounts created in the window, with currency and missing-value counts.
+- `won_outcomes` and `lost_outcomes`: unique CRM outcomes recorded in the window, with unknown outcomes separated.
+- `revenue_attribution`: revenue attached by the customer’s declared attribution model; report model and attribution uncertainty.
+- `cost_per_qualified_opportunity`: authorized campaign and provider cost / unique qualified opportunities; unavailable when cost or qualified-opportunity denominator is missing.
+
+## Segmentation and data quality
+
+Allow filters for customer/tenant, ICP segment, industry, signal type, buyer role, campaign, sending channel, sender identity, and time period. Apply tenant filtering before aggregation. Never expose another tenant’s events through a blended benchmark or error message.
+
+Report duplicate IDs, impossible event order, conflicting delivery/reply states, missing CRM opportunity outcomes, unknown currency, stale records, and cross-system mismatches as warnings. A reply without a delivered or sent event is inconsistent unless the provider explicitly supplies the missing history. Preserve raw event provenance and the IDs used in each numerator and denominator.
+
+## Benchmarks and recommendations
+
+External benchmarks are contextual ranges only. They must include source, population, date, denominator, channel, and applicability limitations; never present them as Neyvro targets or guarantees. Do not manufacture a benchmark when no source is supplied.
+
+Use meetings booked, qualified opportunities, pipeline, and revenue as the primary success measures. Reply and positive-reply rates are useful leading indicators. Open rates are directional deliverability diagnostics only and must not be the primary KPI or an A/B winner criterion.
+
+Tie recommendations to observed performance and sample size: identify the lowest trustworthy funnel stage, state whether the sample is sufficient, suggest targeting/copy/list/deliverability/follow-up investigation, and distinguish correlation from causal impact. A segment difference is correlation unless randomized treatment, a credible quasi-experiment, or another causal design is documented.
+
+## MCP contracts
+
+- `neyvro_get_campaign_metrics` — read tenant-authorized campaign, delivery, reply, and meeting events.
+- `neyvro_get_pipeline_metrics` — read CRM opportunity stages, amounts, qualification, and outcomes.
+- `neyvro_get_revenue_attribution` — read customer-configured attribution and attached revenue.
+- `neyvro_get_signal_performance` — compare authorized signal types and segments against downstream outcomes.
+
+These contracts are disabled without real adapters. They must return source freshness, scope, time window, segment, and data-quality warnings. No contract invents CRM outcomes or backend records.
+
+## Required result
+
+Return `metrics`, `definitions`, `segments`, `data_quality`, `benchmarks`, `recommendations`, `causal_limits`, `time_window`, and `tenant_scope`. Include `open_rate_note` stating that opens are not the primary success metric. Never claim revenue attribution, campaign lift, or causal impact when the required records or design are unavailable.
+
+See `multichannel-sequences` for campaign state, `email-deliverability` for sending safety, `reply-handling-and-objections` for reply classification, and `evidence` for provenance.
 
 ---
 
@@ -1815,32 +2096,64 @@ Distinguish correlation, influence, and verified revenue attribution. Do not mut
 
 ---
 
-<!-- seo-fundamentals/SKILL.md version 0.1.0 -->
+<!-- seo-fundamentals/SKILL.md version 0.2.0 -->
 
 ---
 name: seo-fundamentals
-description: Activate when auditing or planning technical, on-page, content, or authority improvements for a website.
-version: 0.1.0
-maturity: contract
-mode: knowledge
-required_scopes: []
-related_skills: ["generative-engine-optimization","content-marketing-engine"]
+description: Activate when auditing an explicitly authorized website for technical SEO, crawlability, indexing, metadata, headings, internal links, content relevance, page experience, mobile readiness, or structured data; this optional module never deploys or merges changes.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read", "proposals:write"]
+  related_skills: ["generative-engine-optimization", "content-marketing-engine", "evidence"]
 ---
 
-# seo fundamentals
+# SEO fundamentals
 
-Explain SEO audits and prioritization. Neyvro currently has no SEO crawler or publisher backend, so live research and external changes are blocked.
+Provide an actionable, source-attributed SEO audit for a customer-authorized website. Keep SEO optional so unavailable crawling, Search Console, repository, or performance data never blocks core company intelligence or GTM workflows.
 
-## Behavior modes
+## Audit workflow
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
+1. Validate the URL and authorization scope. Accept only `http`/`https` URLs the customer authorized; do not crawl inaccessible, private, or unrelated hosts.
+2. Read robots directives and provider rate limits before fetching. Respect disallowed paths, crawl budgets, redirects, authentication boundaries, and partial-crawl limits. A blocked page is an access result, not a guessed issue.
+3. Inspect available HTML and headers for crawlability/indexing, title and meta description, canonical, heading hierarchy, internal links, image alt text, content relevance, mobile viewport, HTTPS, page-experience signals, and JSON-LD/structured data.
+4. Separate observations from recommendations. Every issue includes URL/page source, observed value, severity, confidence, and why it matters. Missing Search Console/ranking/traffic/Core Web Vitals data remains `unknown`; never invent performance or search rankings.
+5. Prioritize by impact, confidence, effort, and implementation dependency. Include a verification checklist with the evidence needed to confirm each fix.
+6. If repository changes are requested, create only a reviewable proposal or pull request through authorized repository access. Never merge, deploy, edit DNS, or publish automatically.
 
-## Contract
+## Audit areas
 
-- Activation: Activate when auditing or planning technical, on-page, content, or authority improvements for a website.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+- **Technical:** robots.txt, sitemap discoverability, status codes, redirects/chains, canonical URLs, HTTPS, crawl errors, index directives, JavaScript dependency.
+- **On-page:** unique title, meta description, one logical H1, H2/H3 hierarchy, descriptive URLs, internal linking, image alt text.
+- **Content relevance:** search intent, topic coverage, useful/people-first content, freshness only when dates are observed, authorship and primary-source signals.
+- **Experience/mobile:** viewport, responsive signals, page-weight/latency observations only when actually measured, mobile rendering, intrusive elements.
+- **Structured data:** valid-looking JSON-LD presence/type and required-field gaps; do not promise rich results.
+
+## Required output
+
+```json
+{
+  "status": "complete|partial|blocked|invalid_url|inaccessible",
+  "site": "https://example.com",
+  "crawl": {"pages_requested": 10, "pages_analyzed": 7, "partial": true, "robots_respected": true, "rate_limit_events": []},
+  "observations": [],
+  "issues": [{"id": "seo-1", "area": "metadata", "severity": "high|medium|low|unknown", "url": "...", "observation": "...", "evidence": [], "confidence": 0.9}],
+  "recommendations": [{"issue_id": "seo-1", "improvement": "...", "priority": 1, "effort": "low|medium|high", "verification": "..."}],
+  "unknown_metrics": ["rankings", "organic traffic", "Core Web Vitals"],
+  "verification_checklist": [],
+  "repository_proposal": null,
+  "merge_or_deploy_executed": false
+}
+```
+
+## MCP contracts
+
+- `neyvro_analyze_website` — run a bounded, authorized, robots-aware website analysis.
+- `neyvro_get_seo_recommendations` — retrieve or prioritize recommendations from an audit.
+- `neyvro_propose_seo_changes` — create a reviewable repository proposal/PR only when repository authorization exists.
+
+These contracts are optional and disabled without an authorized adapter. Repository proposals require explicit repository access and review permissions; merge and deploy are unsupported. Do not require direct repository or DNS access for an audit.
+
+See also: `generative-engine-optimization` for answer-engine discoverability and `content-marketing-engine` for content planning.

@@ -3,7 +3,7 @@
   "format": "Agent Skills (SKILL.md)",
   "version": "0.1.0",
   "source": "Neyvro",
-  "count": 26,
+  "count": 27,
   "skills": [
     {
       "name": "account-research",
@@ -91,15 +91,19 @@
     },
     {
       "name": "content-marketing-engine",
-      "description": "Activate when planning buyer-question content, repurposing, distribution, or editorial measurement.",
-      "version": "0.1.0",
-      "maturity": "contract",
-      "mode": "knowledge",
-      "required_scopes": [],
+      "description": "Activate when planning, drafting, repurposing, distributing, or measuring customer content from verified buyer questions, positioning, research, and approved brand voice; publishing always requires an authorized channel and explicit approval.",
+      "version": "0.2.0",
+      "maturity": "playbook",
+      "mode": "draft",
+      "required_scopes": [
+        "intelligence:read",
+        "content:draft"
+      ],
       "related_skills": [
         "positioning-and-messaging",
         "seo-fundamentals",
-        "generative-engine-optimization"
+        "generative-engine-optimization",
+        "evidence"
       ],
       "path": "content-marketing-engine/SKILL.md"
     },
@@ -140,9 +144,9 @@
     },
     {
       "name": "discovery-and-qualification",
-      "description": "Activate when evaluating whether a company or contact is a qualified opportunity and preparing discovery questions.",
-      "version": "0.1.0",
-      "maturity": "contract",
+      "description": "Activate when qualifying an authorized sales opportunity or preparing a discovery-call brief using evidence, buyer research, conversation context, CRM records, and meeting history; never qualify from AI inference alone.",
+      "version": "0.2.0",
+      "maturity": "playbook",
       "mode": "research",
       "required_scopes": [
         "intelligence:read"
@@ -150,7 +154,8 @@
       "related_skills": [
         "ideal-customer-profile",
         "buyer-matching",
-        "predictive-problems"
+        "predictive-problems",
+        "reply-handling-and-objections"
       ],
       "path": "discovery-and-qualification/SKILL.md"
     },
@@ -190,11 +195,14 @@
     },
     {
       "name": "generative-engine-optimization",
-      "description": "Activate when assessing or planning how a site or brand can be retrieved, quoted, and cited by AI answer engines.",
-      "version": "0.1.0",
-      "maturity": "contract",
-      "mode": "knowledge",
-      "required_scopes": [],
+      "description": "Activate when assessing or improving an authorized website\u2019s discoverability, answer-first content, entity clarity, structured data, AI-crawler access, freshness, or measurement plan for AI answer engines; never promise citations or fabricate visibility.",
+      "version": "0.2.0",
+      "maturity": "playbook",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read",
+        "proposals:write"
+      ],
       "related_skills": [
         "seo-fundamentals",
         "content-marketing-engine",
@@ -218,6 +226,23 @@
         "lead-sourcing-and-enrichment"
       ],
       "path": "gtm-automation-with-chronos/SKILL.md"
+    },
+    {
+      "name": "gtm-automation-with-neyvro",
+      "description": "Activate when coordinating Neyvro knowledge skills with connected customer intelligence, research, drafting, campaign, mailbox, conversation, meeting, SEO/GEO, content, or analytics services; use capability discovery and approval gates before any external action.",
+      "version": "0.2.0",
+      "maturity": "playbook",
+      "mode": "execution",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "gtm-strategy",
+        "multichannel-sequences",
+        "outbound-metrics-and-benchmarks",
+        "evidence"
+      ],
+      "path": "gtm-automation-with-neyvro/SKILL.md"
     },
     {
       "name": "gtm-strategy",
@@ -330,17 +355,19 @@
     },
     {
       "name": "outbound-metrics-and-benchmarks",
-      "description": "Activate when measuring outreach funnels, setting denominators, comparing benchmarks, or diagnosing campaign health.",
-      "version": "0.1.0",
-      "maturity": "contract",
+      "description": "Activate when analyzing outbound funnel performance, campaign health, attribution, or contextual benchmarks using Neyvro campaign, conversation, and CRM records; every metric must expose its numerator, denominator, time window, segment, and data limitations.",
+      "version": "0.2.0",
+      "maturity": "playbook",
       "mode": "research",
       "required_scopes": [
         "intelligence:read"
       ],
       "related_skills": [
+        "cold-email-writing",
         "email-deliverability",
         "multichannel-sequences",
-        "revenue-attribution"
+        "linkedin-outreach",
+        "reply-handling-and-objections"
       ],
       "path": "outbound-metrics-and-benchmarks/SKILL.md"
     },
@@ -432,14 +459,18 @@
     },
     {
       "name": "seo-fundamentals",
-      "description": "Activate when auditing or planning technical, on-page, content, or authority improvements for a website.",
-      "version": "0.1.0",
-      "maturity": "contract",
-      "mode": "knowledge",
-      "required_scopes": [],
+      "description": "Activate when auditing an explicitly authorized website for technical SEO, crawlability, indexing, metadata, headings, internal links, content relevance, page experience, mobile readiness, or structured data; this optional module never deploys or merges changes.",
+      "version": "0.2.0",
+      "maturity": "playbook",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read",
+        "proposals:write"
+      ],
       "related_skills": [
         "generative-engine-optimization",
-        "content-marketing-engine"
+        "content-marketing-engine",
+        "evidence"
       ],
       "path": "seo-fundamentals/SKILL.md"
     }

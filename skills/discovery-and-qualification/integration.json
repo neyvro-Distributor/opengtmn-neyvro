@@ -1,0 +1,15 @@
+{
+  "skill": "discovery-and-qualification",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "read_only": true,
+  "contracts": [
+    {"name": "neyvro_get_opportunity_qualification", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked", "not_found"]},
+    {"name": "neyvro_generate_discovery_brief", "operation": "planning", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]},
+    {"name": "neyvro_get_buying_committee", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]},
+    {"name": "neyvro_get_meeting_context", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "disabled", "blocked"]}
+  ],
+  "setup_gaps": ["tenant-scoped CRM opportunity read adapter", "Gmail/Microsoft meeting or transcript synchronization", "authorized conversation-intelligence provider"],
+  "authorization": "Qualification and discovery outputs are read-only planning artifacts; no CRM stage, opportunity, buyer, or outbound message is mutated."
+}

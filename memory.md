@@ -119,6 +119,48 @@ This file records the work implemented in this repository so the project history
 - Added disabled-by-default contracts for `neyvro_get_conversation`, `neyvro_get_reply_status`, `neyvro_classify_reply`, `neyvro_draft_reply`, and `neyvro_get_followup_queue`, with separate read/draft/send permission boundaries.
 - Added tests for interested/meeting replies, hard rejection, unsubscribe, wrong person, out-of-office, objections, duplicate webhooks, wrong threads, unknown replies, tenant isolation, and disabled adapters.
 
+### 2026-10-23 — Discovery and qualification skill
+
+- Upgraded `skills/discovery-and-qualification/SKILL.md` to an evidence-backed BANT, MEDDIC, and MEDDPICC workflow covering account briefings, qualification dimensions, buying committees, pain severity, objections, disqualification, discovery questions, and read-only next steps.
+- Added `src/neyvro/qualification.py` with explicit verified-fact requirements, unknown budget/timing protection, conflict detection, nonbuyer/disqualified states, committee mapping, CRM/meeting research gaps, and injected MCP adapters.
+- Added disabled-by-default contracts for `neyvro_get_opportunity_qualification`, `neyvro_generate_discovery_brief`, `neyvro_get_buying_committee`, and `neyvro_get_meeting_context`.
+- Added tests for incomplete, explicitly qualified, conflicting, nonbuyer, disqualified, MEDDPICC committee, missing CRM/meeting context, and disabled-adapter behavior.
+
+### 2026-10-23 — SEO fundamentals skill
+
+- Upgraded `skills/seo-fundamentals/SKILL.md` to an optional, authorized, robots-aware SEO audit workflow covering crawlability, indexing, redirects, metadata, headings, internal links, content relevance, mobile/page experience, structured data, severity, priority, and verification checklists.
+- Added `src/neyvro/seo.py` with bounded snapshot analysis, invalid/inaccessible/partial crawl handling, explicit unknown performance metrics, actionable issue recommendations, and review-only repository change proposals.
+- Added disabled-by-default contracts for `neyvro_analyze_website`, `neyvro_get_seo_recommendations`, and `neyvro_propose_seo_changes`; merge/deploy is permanently unsupported.
+- Added tests for invalid/inaccessible sites, robots gating, redirects, missing metadata, partial/rate-limited crawls, unknown metrics, unauthorized repository access, reviewable proposals, and disabled adapters.
+
+### 2026-10-23 — Generative engine optimization skill
+
+- Upgraded `skills/generative-engine-optimization/SKILL.md` to an evidence-labeled GEO/AEO workflow covering crawler access, answer-first content, citations, schema, entity consistency, authority, freshness, optional `llms.txt`, and measurement planning.
+- Added `src/neyvro/geo.py` with bounded authorized-snapshot audits, explicit conflicts and unknowns, unavailable visibility handling, and review-only repository proposals.
+- Added disabled-by-default contracts for `neyvro_get_geo_audit`, `neyvro_get_ai_visibility_findings`, and `neyvro_propose_geo_improvements`; no website changes, merges, deploys, or fabricated engine measurements.
+- Added tests for malformed schema, crawler restrictions, missing/conflicting data, unsupported visibility measurements, repository authorization, and disabled adapters.
+
+### 2026-10-23 — Content marketing engine skill
+
+- Upgraded `skills/content-marketing-engine/SKILL.md` to an evidence-grounded content workflow covering buyer-question ideation, editorial briefs, drafting, repurposing, channel norms, measurement limits, lifecycle states, and explicit approval.
+- Added `src/neyvro/content_marketing.py` with deterministic ideas, claim-reviewed drafts, channel checks, duplicate publication detection, approval-gated social proposals, and disabled-by-default adapters.
+- Added contracts for `neyvro_generate_content_ideas`, `neyvro_create_content_brief`, `neyvro_draft_content`, `neyvro_get_content_calendar`, and `neyvro_propose_social_post`.
+- Added tests for draft quality, incomplete claims, brand voice, unsupported channels, authorization/approval gating, duplicate publication, and disabled adapters.
+
+### 2026-10-23 — Outbound metrics and benchmarks skill
+
+- Upgraded `skills/outbound-metrics-and-benchmarks/SKILL.md` to an explicit-denominator outbound analytics workflow covering contacts, verification, delivery, bounce, replies, meetings, opportunities, pipeline, outcomes, revenue attribution, costs, segmentation, sample sizes, and causal limits.
+- Added `src/neyvro/outbound_metrics.py` with tenant/window/segment filtering, duplicate event handling, inconsistent-event warnings, zero-denominator protection, contextual benchmark comparison, and evidence-tied recommendations.
+- Added disabled-by-default contracts for `neyvro_get_campaign_metrics`, `neyvro_get_pipeline_metrics`, `neyvro_get_revenue_attribution`, and `neyvro_get_signal_performance`.
+- Added tests for funnel aggregation, zero denominators, missing CRM outcomes, duplicate/inconsistent events, tenant isolation, contextual benchmarks, sample-size recommendations, and disabled adapters.
+
+### 2026-10-23 — GTM automation with Neyvro skill
+
+- Added `skills/gtm-automation-with-neyvro/SKILL.md` as the Neyvro-native bridge from portable knowledge skills to capability discovery and approved execution; it does not require Chronos accounts, APIs, or `geo_*` tools.
+- Added `src/neyvro/gtm_automation.py` with a complete skill-to-Neyvro-tool map, connection/authentication/scope/service/account discovery, server-equivalent action gates, approval checks, workflow phases, and disconnected knowledge-only behavior.
+- Added discovery contracts for `neyvro_get_capabilities`, `neyvro_get_connections`, `neyvro_get_permissions`, and `neyvro_get_approval_status`, plus `integration.json`.
+- Expanded the canonical registry from 26 to 27 skills and added tests for disconnected, invalid-auth, insufficient-scope, unavailable-service, pending-approval, approved-gate, secret-redaction, native-tool mapping, and disabled-adapter states.
+
 ## Future entries
 
 When implementing new work, add an entry using this format:

@@ -22,7 +22,8 @@ claimed to exist until the corresponding files are added and validated.
 | `generative-engine-optimization` | `neyvro-geo-audit` | No GEO crawler/publisher route found; require site-analysis provider | MISSING |
 | `content-marketing-engine` | `neyvro-content-planning` | No content/social publishing backend found; proposal-only contract initially | MISSING |
 | `outbound-metrics-and-benchmarks` | `neyvro-outbound-analytics` | operations metrics; campaign/send/reply aggregates; explicit denominators | PARTIAL |
-| `gtm-automation-with-chronos` | `neyvro-automation-bridge` | Neyvro MCP capability discovery; approval and scope contract; no Chronos tool proxy | BLOCKED |
+| `gtm-automation-with-chronos` | `gtm-automation-with-neyvro` compatibility bridge | Neyvro MCP capability discovery; approval and scope contract; no Chronos tool proxy | IMPLEMENTED plugin bridge |
+| `gtm-automation-with-neyvro` | `gtm-automation-with-neyvro` | `neyvro_get_capabilities`, `neyvro_get_connections`, `neyvro_get_permissions`, `neyvro_get_approval_status`; server-side gates for named services | IMPLEMENTED plugin bridge |
 
 ## Mapping rule
 

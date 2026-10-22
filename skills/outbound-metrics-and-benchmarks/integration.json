@@ -1,0 +1,14 @@
+{
+  "skill": "outbound-metrics-and-benchmarks",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "contracts": [
+    {"name": "neyvro_get_campaign_metrics", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "partial", "blocked", "disabled"]},
+    {"name": "neyvro_get_pipeline_metrics", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "partial", "blocked", "disabled"]},
+    {"name": "neyvro_get_revenue_attribution", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "partial", "blocked", "disabled"]},
+    {"name": "neyvro_get_signal_performance", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "partial", "blocked", "disabled"]}
+  ],
+  "setup_requirements": ["tenant-authorized campaign and conversation events", "CRM opportunity and revenue records", "declared attribution model", "cost records with currency", "event deduplication identifiers"],
+  "authorization": "Analytics are read-only and tenant-scoped; external benchmarks remain contextual and no outbound action is executed."
+}

@@ -1,0 +1,14 @@
+{
+  "skill": "generative-engine-optimization",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "optional_module": true,
+  "contracts": [
+    {"name": "neyvro_get_geo_audit", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "partial", "blocked", "disabled"]},
+    {"name": "neyvro_get_ai_visibility_findings", "operation": "read", "required_scopes": ["intelligence:read"], "approval_required": false, "output_status": ["available", "unavailable", "conflicting", "disabled"]},
+    {"name": "neyvro_propose_geo_improvements", "operation": "proposal", "required_scopes": ["proposals:write"], "approval_required": true, "output_status": ["proposed", "unauthorized", "disabled", "blocked"]}
+  ],
+  "setup_requirements": ["explicit website authorization", "authorized crawler/website audit adapter", "optional visibility measurement provider", "optional authorized repository provider for reviewable PRs"],
+  "authorization": "No website changes, merge, deploy, or visibility claims occur without authorized providers and human review."
+}

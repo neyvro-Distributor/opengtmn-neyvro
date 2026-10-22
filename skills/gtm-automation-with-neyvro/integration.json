@@ -1,0 +1,15 @@
+{
+  "skill": "gtm-automation-with-neyvro",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "contracts": [
+    {"name": "neyvro_get_capabilities", "operation": "read", "required_scopes": [], "approval_required": false, "output_status": ["available", "disconnected", "invalid_auth", "disabled"]},
+    {"name": "neyvro_get_connections", "operation": "read", "required_scopes": [], "approval_required": false, "output_status": ["available", "disconnected", "invalid_auth", "disabled"]},
+    {"name": "neyvro_get_permissions", "operation": "read", "required_scopes": [], "approval_required": false, "output_status": ["available", "disconnected", "invalid_auth", "disabled"]},
+    {"name": "neyvro_get_approval_status", "operation": "read", "required_scopes": [], "approval_required": false, "output_status": ["approved", "pending_approval", "expired", "not_found", "disabled"]}
+  ],
+  "workflow": ["RESEARCH", "PLAN", "DRAFT", "REVIEW", "APPROVE", "EXECUTE", "VERIFY", "LEARN"],
+  "setup_requirements": ["tenant identity", "Neyvro MCP endpoint", "valid authentication", "service-specific scopes", "connected provider accounts", "server-side approval and audit enforcement"],
+  "authorization": "This bridge never proxies Chronos or geo_* tools. Write and send operations require the named Neyvro service, current approval, scope checks, eligibility checks, idempotency, and verification."
+}

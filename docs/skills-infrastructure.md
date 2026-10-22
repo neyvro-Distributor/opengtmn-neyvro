@@ -2,7 +2,7 @@
 
 The canonical skill library lives in `skills/`. Each skill is a portable
 `SKILL.md` with required `name` and activation-oriented `description` fields.
-The current 26 files are contract-phase definitions: they define behavior
+The current 27 files are contract-phase definitions: they define behavior
 boundaries and backend expectations while later work adds substantive playbooks.
 
 ## Discovery and context control
