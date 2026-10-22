@@ -28,6 +28,7 @@ from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.provider import AccessToken, TokenVerifier
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import JSONResponse
 from starlette.routing import Route
@@ -287,7 +288,17 @@ def build_server() -> FastMCP:
     issuer = os.getenv("NEYVRO_MCP_OAUTH_ISSUER")
     audience = os.getenv("NEYVRO_MCP_OAUTH_AUDIENCE")
     jwks = os.getenv("NEYVRO_MCP_OAUTH_JWKS_URL")
-    kwargs: dict[str, Any] = {"name": "neyvro-remote", "instructions": "Tenant-scoped Neyvro GTM tools with explicit authorization and readiness states.", "log_level": "WARNING"}
+    allowed_hosts = [host.strip() for host in os.getenv("NEYVRO_MCP_ALLOWED_HOSTS", "").split(",") if host.strip()]
+    allowed_origins = [origin.strip() for origin in os.getenv("NEYVRO_MCP_ALLOWED_ORIGINS", "").split(",") if origin.strip()]
+    kwargs: dict[str, Any] = {
+        "name": "neyvro-remote",
+        "instructions": "Tenant-scoped Neyvro GTM tools with explicit authorization and readiness states.",
+        "log_level": "WARNING",
+        "transport_security": TransportSecuritySettings(
+            allowed_hosts=allowed_hosts,
+            allowed_origins=allowed_origins,
+        ),
+    }
     if issuer and audience and jwks:
         verifier = JWTVerifier(issuer, audience, jwks)
         kwargs["token_verifier"] = verifier
