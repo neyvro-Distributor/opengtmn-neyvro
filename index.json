@@ -1,0 +1,431 @@
+{
+  "name": "neyvro-skills",
+  "format": "Agent Skills (SKILL.md)",
+  "version": "0.1.0",
+  "source": "Neyvro",
+  "count": 26,
+  "skills": [
+    {
+      "name": "account-research",
+      "description": "Activate when researching a specific company or person before an authorized GTM decision, draft, or investigation.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "ideal-customer-profile",
+        "evidence",
+        "outreach-personalization"
+      ],
+      "path": "account-research/SKILL.md"
+    },
+    {
+      "name": "buyer-matching",
+      "description": "Activate when matching a target account or problem to buyer roles using authorized company and contact evidence.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "ideal-customer-profile",
+        "lead-sourcing-and-enrichment",
+        "discovery-and-qualification"
+      ],
+      "path": "buyer-matching/SKILL.md"
+    },
+    {
+      "name": "buying-windows",
+      "description": "Activate when assessing whether dated company changes create a timely, evidence-backed opportunity to investigate or propose outreach.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "company-changes",
+        "predictive-problems",
+        "buyer-matching",
+        "evidence"
+      ],
+      "path": "buying-windows/SKILL.md"
+    },
+    {
+      "name": "cold-email-writing",
+      "description": "Activate when drafting or reviewing a personalized cold email or short sequence from authorized evidence.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "draft",
+      "required_scopes": [
+        "intelligence:read",
+        "proposals:write"
+      ],
+      "related_skills": [
+        "account-research",
+        "outreach-personalization",
+        "email-deliverability"
+      ],
+      "path": "cold-email-writing/SKILL.md"
+    },
+    {
+      "name": "company-changes",
+      "description": "Activate when detecting, explaining, or reviewing material changes in a target company's business context.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "digital-twins",
+        "evidence",
+        "buying-windows"
+      ],
+      "path": "company-changes/SKILL.md"
+    },
+    {
+      "name": "content-marketing-engine",
+      "description": "Activate when planning buyer-question content, repurposing, distribution, or editorial measurement.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "knowledge",
+      "required_scopes": [],
+      "related_skills": [
+        "positioning-and-messaging",
+        "seo-fundamentals",
+        "generative-engine-optimization"
+      ],
+      "path": "content-marketing-engine/SKILL.md"
+    },
+    {
+      "name": "continuous-investigation",
+      "description": "Activate when creating, monitoring, reviewing, assigning, or correcting a bounded Neyvro investigation.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read",
+        "proposals:write"
+      ],
+      "related_skills": [
+        "evidence",
+        "negative-evidence",
+        "company-changes",
+        "predictive-problems"
+      ],
+      "path": "continuous-investigation/SKILL.md"
+    },
+    {
+      "name": "digital-twins",
+      "description": "Activate when building or reviewing an evidence-backed, time-aware projection of a company, buyer, or opportunity.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "account-research",
+        "company-changes",
+        "evidence",
+        "negative-evidence"
+      ],
+      "path": "digital-twins/SKILL.md"
+    },
+    {
+      "name": "discovery-and-qualification",
+      "description": "Activate when evaluating whether a company or contact is a qualified opportunity and preparing discovery questions.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "ideal-customer-profile",
+        "buyer-matching",
+        "predictive-problems"
+      ],
+      "path": "discovery-and-qualification/SKILL.md"
+    },
+    {
+      "name": "email-deliverability",
+      "description": "Activate when assessing sending-domain readiness, authentication, reputation, pacing, bounce, or complaint risk.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "cold-email-writing",
+        "multichannel-sequences",
+        "outbound-metrics-and-benchmarks"
+      ],
+      "path": "email-deliverability/SKILL.md"
+    },
+    {
+      "name": "evidence",
+      "description": "Activate when collecting, viewing, evaluating, correcting, or citing source-attributed evidence for Neyvro intelligence.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read",
+        "proposals:write"
+      ],
+      "related_skills": [
+        "account-research",
+        "company-changes",
+        "negative-evidence",
+        "continuous-investigation"
+      ],
+      "path": "evidence/SKILL.md"
+    },
+    {
+      "name": "generative-engine-optimization",
+      "description": "Activate when assessing or planning how a site or brand can be retrieved, quoted, and cited by AI answer engines.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "knowledge",
+      "required_scopes": [],
+      "related_skills": [
+        "seo-fundamentals",
+        "content-marketing-engine",
+        "evidence"
+      ],
+      "path": "generative-engine-optimization/SKILL.md"
+    },
+    {
+      "name": "gtm-automation-with-chronos",
+      "description": "Activate when a user asks to turn GTM planning into external execution through an authorized MCP or provider.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "execution",
+      "required_scopes": [
+        "proposals:write",
+        "messages:send"
+      ],
+      "related_skills": [
+        "multichannel-sequences",
+        "cold-email-writing",
+        "lead-sourcing-and-enrichment"
+      ],
+      "path": "gtm-automation-with-chronos/SKILL.md"
+    },
+    {
+      "name": "gtm-strategy",
+      "description": "Activate when selecting, reviewing, or refining a product's go-to-market motion, acquisition channels, or 30/60/90-day execution plan.",
+      "version": "0.2.0",
+      "maturity": "playbook",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read",
+        "proposals:write"
+      ],
+      "related_skills": [
+        "ideal-customer-profile",
+        "positioning-and-messaging",
+        "account-research",
+        "outbound-metrics-and-benchmarks",
+        "content-marketing-engine"
+      ],
+      "path": "gtm-strategy/SKILL.md"
+    },
+    {
+      "name": "ideal-customer-profile",
+      "description": "Activate when defining, refining, scoring, or reviewing an ideal customer profile, buyer roles, triggers, or anti-ICP.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "gtm-strategy",
+        "account-research",
+        "buyer-matching"
+      ],
+      "path": "ideal-customer-profile/SKILL.md"
+    },
+    {
+      "name": "lead-sourcing-and-enrichment",
+      "description": "Activate when finding or enriching ICP-fit companies and contacts with verified, source-labeled data.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "ideal-customer-profile",
+        "account-research",
+        "evidence"
+      ],
+      "path": "lead-sourcing-and-enrichment/SKILL.md"
+    },
+    {
+      "name": "linkedin-outreach",
+      "description": "Activate when planning or reviewing compliant LinkedIn prospecting and relationship outreach.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "knowledge",
+      "required_scopes": [],
+      "related_skills": [
+        "account-research",
+        "outreach-personalization",
+        "multichannel-sequences"
+      ],
+      "path": "linkedin-outreach/SKILL.md"
+    },
+    {
+      "name": "multichannel-sequences",
+      "description": "Activate when designing, reviewing, or operating a multi-step outreach cadence with explicit branch and stop logic.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "draft",
+      "required_scopes": [
+        "proposals:write"
+      ],
+      "related_skills": [
+        "cold-email-writing",
+        "linkedin-outreach",
+        "reply-handling-and-objections"
+      ],
+      "path": "multichannel-sequences/SKILL.md"
+    },
+    {
+      "name": "negative-evidence",
+      "description": "Activate when recording, evaluating, or explaining disconfirming evidence, missing signals, or reasons not to act.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read",
+        "proposals:write"
+      ],
+      "related_skills": [
+        "evidence",
+        "predictive-problems",
+        "continuous-investigation"
+      ],
+      "path": "negative-evidence/SKILL.md"
+    },
+    {
+      "name": "outbound-metrics-and-benchmarks",
+      "description": "Activate when measuring outreach funnels, setting denominators, comparing benchmarks, or diagnosing campaign health.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "email-deliverability",
+        "multichannel-sequences",
+        "revenue-attribution"
+      ],
+      "path": "outbound-metrics-and-benchmarks/SKILL.md"
+    },
+    {
+      "name": "outreach-personalization",
+      "description": "Activate when converting verified company or buyer evidence into relevant, non-creepy outreach personalization.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "draft",
+      "required_scopes": [
+        "intelligence:read",
+        "proposals:write"
+      ],
+      "related_skills": [
+        "account-research",
+        "cold-email-writing",
+        "evidence"
+      ],
+      "path": "outreach-personalization/SKILL.md"
+    },
+    {
+      "name": "positioning-and-messaging",
+      "description": "Activate when translating a product's differentiated value into positioning, message houses, or evidence-backed outreach angles.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "draft",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "gtm-strategy",
+        "ideal-customer-profile",
+        "cold-email-writing"
+      ],
+      "path": "positioning-and-messaging/SKILL.md"
+    },
+    {
+      "name": "predictive-problems",
+      "description": "Activate when identifying or reviewing likely future business problems from current evidence and patterns.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "company-changes",
+        "evidence",
+        "discovery-and-qualification",
+        "buying-windows"
+      ],
+      "path": "predictive-problems/SKILL.md"
+    },
+    {
+      "name": "reply-handling-and-objections",
+      "description": "Activate when classifying a prospect reply, drafting a response, or deciding whether follow-up must stop.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read",
+        "proposals:write"
+      ],
+      "related_skills": [
+        "cold-email-writing",
+        "discovery-and-qualification",
+        "multichannel-sequences"
+      ],
+      "path": "reply-handling-and-objections/SKILL.md"
+    },
+    {
+      "name": "revenue-attribution",
+      "description": "Activate when linking evidence and approved GTM actions to pipeline or revenue outcomes with explicit attribution limits.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "outbound-metrics-and-benchmarks",
+        "continuous-investigation",
+        "evidence"
+      ],
+      "path": "revenue-attribution/SKILL.md"
+    },
+    {
+      "name": "seo-fundamentals",
+      "description": "Activate when auditing or planning technical, on-page, content, or authority improvements for a website.",
+      "version": "0.1.0",
+      "maturity": "contract",
+      "mode": "knowledge",
+      "required_scopes": [],
+      "related_skills": [
+        "generative-engine-optimization",
+        "content-marketing-engine"
+      ],
+      "path": "seo-fundamentals/SKILL.md"
+    }
+  ]
+}

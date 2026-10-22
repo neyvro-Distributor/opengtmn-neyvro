@@ -1,0 +1,37 @@
+name: Neyvro skills
+
+on:
+  push:
+    paths:
+      - "skills/**"
+      - "src/neyvro/skill_*.py"
+      - "tests/test_skill_library.py"
+      - "index.json"
+      - "llms.txt"
+      - "dist/**"
+      - "pyproject.toml"
+      - ".github/workflows/skills.yml"
+  pull_request:
+    paths:
+      - "skills/**"
+      - "src/neyvro/skill_*.py"
+      - "tests/test_skill_library.py"
+      - "index.json"
+      - "llms.txt"
+      - "dist/**"
+      - "pyproject.toml"
+      - ".github/workflows/skills.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install ".[test]"
+      - run: python -m pytest -q
+      - run: python -m neyvro.skill_cli validate
+      - run: python -m neyvro.skill_cli build

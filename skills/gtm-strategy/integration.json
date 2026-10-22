@@ -1,0 +1,32 @@
+{
+  "skill": "gtm-strategy",
+  "version": "0.2.0",
+  "backend": "neyvro-api",
+  "connected_by_default": false,
+  "contracts": [
+    {
+      "name": "neyvro_get_customer_context",
+      "operation": "read",
+      "required_scopes": ["intelligence:read"],
+      "approval_required": false,
+      "input_schema": {"type": "object", "required": ["workspace_id"], "properties": {"workspace_id": {"type": "string", "format": "uuid"}}},
+      "output_status": ["available", "disabled", "blocked"]
+    },
+    {
+      "name": "neyvro_get_gtm_strategy",
+      "operation": "read",
+      "required_scopes": ["intelligence:read"],
+      "approval_required": false,
+      "input_schema": {"type": "object", "required": ["workspace_id"], "properties": {"workspace_id": {"type": "string", "format": "uuid"}, "version": {"type": "string"}}},
+      "output_status": ["available", "disabled", "blocked"]
+    },
+    {
+      "name": "neyvro_propose_gtm_strategy",
+      "operation": "proposal",
+      "required_scopes": ["proposals:write"],
+      "approval_required": true,
+      "input_schema": {"type": "object", "required": ["workspace_id", "strategy", "evidence_ids", "idempotency_key"], "properties": {"workspace_id": {"type": "string", "format": "uuid"}, "strategy": {"type": "object"}, "evidence_ids": {"type": "array", "items": {"type": "string"}}, "idempotency_key": {"type": "string"}}},
+      "output_status": ["proposed", "disabled", "blocked"]
+    }
+  ]
+}
