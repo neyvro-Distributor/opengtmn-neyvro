@@ -1,6 +1,6 @@
 # OAuth verification
 
-Status: **BLOCKED**.
+Status: **BLOCKED — deployment is live, identity is not configured**.
 
 The MCP boundary has configured JWT verification support for issuer, audience,
 JWKS, expiry, subject, tenant, and scopes. No production identity provider,

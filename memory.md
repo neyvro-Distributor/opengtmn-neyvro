@@ -245,6 +245,13 @@ This file records the work implemented in this repository so the project history
 - Verification: the current Render CLI was checked once and returned an expired-token `401`; no deployment command was attempted. Local security and regression findings are separated from production-unverified checks.
 - Notes: customer beta remains NO-GO until the owner reconnects Render, provisions OAuth/PKCE, and supplies the backend trust integration.
 
+### 2026-10-23 — Live Render MCP deployment
+
+- Implemented: committed and pushed the verified package, repaired the existing Render service from Python/Poetry to Docker, pinned the MCP SDK to the FastMCP-compatible major, configured public host validation, and registered the live endpoint in Codex.
+- Files: `pyproject.toml`, `src/neyvro/remote_mcp.py`, and the live Render service configuration for `opengtmn-neyvro`.
+- Verification: deployment `dep-dbd6p43bc2fs73a1eug0` is `live`; `https://opengtmn-neyvro.onrender.com/health` returned HTTP 200; external MCP initialize, `tools/list` (56), `resources/list`/read (35), `prompts/list` (35), and safe unauthenticated tool rejection passed. Codex registration succeeded.
+- Notes: OAuth is still unsupported and backend adapter remains disabled, so private customer-data tools are not enabled. Codex and ChatGPT authenticated customer workflows remain unverified.
+
 ## Future entries
 
 When implementing new work, add an entry using this format:

@@ -1,14 +1,15 @@
 # Render service status
 
-Status: **BLOCKED**.
+Status: **LIVE**.
 
-The current Render CLI authentication expired. Exact observed results:
+The Render CLI was reauthenticated and the existing service was repaired. Exact
+service details:
 
-- `render whoami --output json`: `unauthorized`
-- `render workspaces --output json`: `your token is expired; run render login`
-- `render services --output json`: `your token is expired; run render login`
-- Blueprint validation through Render: `401 Unauthorized`
+- Workspace: `My Workspace` (`tea-dbd6d1rl550s73ar8te0`)
+- Service: `opengtmn-neyvro-` (`srv-dbd6flafngtc73fph450`)
+- URL: `https://opengtmn-neyvro.onrender.com`
+- Deployment: `dep-dbd6p43bc2fs73a1eug0`, status `live`
+- Runtime: Docker, `./Dockerfile`, health check `/health`
 
-No deployment, service creation, database modification, or unrelated-service
-change was attempted. After the owner runs `render login`, the service must be
-created only after confirming the correct workspace and repository.
+No duplicate service or database was created. The prior failed Python runtime
+was replaced on the existing Neyvro service.

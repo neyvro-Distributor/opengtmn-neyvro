@@ -1,7 +1,8 @@
 # Codex connection test
 
-Status: **BLOCKED / NOT TESTED**.
+Status: **PARTIAL**.
 
-Installed CLI: `codex-cli 0.163.0`. `codex mcp list --json` contains no Neyvro
-entry. A real authenticated invocation cannot be performed without a deployed
-HTTPS `/mcp` URL and production OAuth configuration.
+Installed CLI: `codex-cli 0.163.0`. The live server was registered with
+`codex mcp add neyvro --url https://opengtmn-neyvro.onrender.com/mcp` and
+appears enabled in `codex mcp list`. Authentication is unsupported because no
+OAuth issuer is configured; no private-data invocation was claimed.
