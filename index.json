@@ -3,7 +3,7 @@
   "format": "Agent Skills (SKILL.md)",
   "version": "0.1.0",
   "source": "Neyvro",
-  "count": 27,
+  "count": 35,
   "skills": [
     {
       "name": "account-research",
@@ -37,6 +37,38 @@
         "discovery-and-qualification"
       ],
       "path": "buyer-matching/SKILL.md"
+    },
+    {
+      "name": "buyer-opportunity-matching",
+      "description": "Activate when matching an evidence-backed company problem or opportunity to people likely responsible for solving, influencing, approving, or blocking it.",
+      "version": "0.1.0",
+      "maturity": "playbook",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "lead-sourcing-and-enrichment",
+        "discovery-and-qualification",
+        "evidence-verification"
+      ],
+      "path": "buyer-opportunity-matching/SKILL.md"
+    },
+    {
+      "name": "buying-window-detection",
+      "description": "Activate when assessing whether verified company, leadership, technology, funding, security, hiring, or product signals justify attention now under the customer\u2019s ICP and authorization rules.",
+      "version": "0.1.0",
+      "maturity": "playbook",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "predictive-problem-intelligence",
+        "technology-change-detection",
+        "evidence-verification"
+      ],
+      "path": "buying-window-detection/SKILL.md"
     },
     {
       "name": "buying-windows",
@@ -90,6 +122,22 @@
       "path": "company-changes/SKILL.md"
     },
     {
+      "name": "company-digital-twin-analysis",
+      "description": "Activate when reconstructing an authorized company\u2019s current state, historical timeline, transitions, and supporting evidence from Neyvro digital-twin data; never fill unknown fields from assumptions.",
+      "version": "0.1.0",
+      "maturity": "playbook",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "evidence-verification",
+        "technology-change-detection",
+        "account-research"
+      ],
+      "path": "company-digital-twin-analysis/SKILL.md"
+    },
+    {
       "name": "content-marketing-engine",
       "description": "Activate when planning, drafting, repurposing, distributing, or measuring customer content from verified buyer questions, positioning, research, and approved brand voice; publishing always requires an authorized channel and explicit approval.",
       "version": "0.2.0",
@@ -106,6 +154,22 @@
         "evidence"
       ],
       "path": "content-marketing-engine/SKILL.md"
+    },
+    {
+      "name": "continuous-account-investigation",
+      "description": "Activate when reviewing unresolved company questions, selecting permitted next research actions, and enforcing freshness, scope, cost, and research-budget limits for ongoing account investigation.",
+      "version": "0.1.0",
+      "maturity": "playbook",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "company-digital-twin-analysis",
+        "evidence-verification",
+        "negative-evidence-analysis"
+      ],
+      "path": "continuous-account-investigation/SKILL.md"
     },
     {
       "name": "continuous-investigation",
@@ -192,6 +256,22 @@
         "continuous-investigation"
       ],
       "path": "evidence/SKILL.md"
+    },
+    {
+      "name": "evidence-verification",
+      "description": "Activate when checking whether a company, buyer, technology, opportunity, or revenue claim is observed, inferred, stale, contradictory, or unsupported by authorized Neyvro evidence.",
+      "version": "0.1.0",
+      "maturity": "playbook",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "evidence",
+        "negative-evidence-analysis",
+        "company-digital-twin-analysis"
+      ],
+      "path": "evidence-verification/SKILL.md"
     },
     {
       "name": "generative-engine-optimization",
@@ -354,6 +434,22 @@
       "path": "negative-evidence/SKILL.md"
     },
     {
+      "name": "negative-evidence-analysis",
+      "description": "Activate when actively looking for verified facts, missing prerequisites, contradictions, or disqualifiers that weaken an account, buyer, opportunity, or predictive hypothesis.",
+      "version": "0.1.0",
+      "maturity": "playbook",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "evidence-verification",
+        "buyer-opportunity-matching",
+        "predictive-problem-intelligence"
+      ],
+      "path": "negative-evidence-analysis/SKILL.md"
+    },
+    {
       "name": "outbound-metrics-and-benchmarks",
       "description": "Activate when analyzing outbound funnel performance, campaign health, attribution, or contextual benchmarks using Neyvro campaign, conversation, and CRM records; every metric must expose its numerator, denominator, time window, segment, and data limitations.",
       "version": "0.2.0",
@@ -408,6 +504,22 @@
       "path": "positioning-and-messaging/SKILL.md"
     },
     {
+      "name": "predictive-problem-intelligence",
+      "description": "Activate when mapping verified company or technology changes to possible customer-relevant problems, while keeping hypotheses distinct from facts and respecting the customer ICP.",
+      "version": "0.1.0",
+      "maturity": "playbook",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "technology-change-detection",
+        "ideal-customer-profile",
+        "evidence-verification"
+      ],
+      "path": "predictive-problem-intelligence/SKILL.md"
+    },
+    {
       "name": "predictive-problems",
       "description": "Activate when identifying or reviewing likely future business problems from current evidence and patterns.",
       "version": "0.1.0",
@@ -443,17 +555,17 @@
     },
     {
       "name": "revenue-attribution",
-      "description": "Activate when linking evidence and approved GTM actions to pipeline or revenue outcomes with explicit attribution limits.",
-      "version": "0.1.0",
-      "maturity": "contract",
+      "description": "Activate when tracing authorized signals through buyers, campaigns, meetings, opportunities, deals, and revenue using an explicit attribution model and complete provenance.",
+      "version": "0.2.0",
+      "maturity": "playbook",
       "mode": "research",
       "required_scopes": [
         "intelligence:read"
       ],
       "related_skills": [
         "outbound-metrics-and-benchmarks",
-        "continuous-investigation",
-        "evidence"
+        "evidence-verification",
+        "continuous-account-investigation"
       ],
       "path": "revenue-attribution/SKILL.md"
     },
@@ -473,6 +585,22 @@
         "evidence"
       ],
       "path": "seo-fundamentals/SKILL.md"
+    },
+    {
+      "name": "technology-change-detection",
+      "description": "Activate when identifying authorized, evidence-backed technology adoption, migration, engineering, or infrastructure changes and gaps between current and desired state.",
+      "version": "0.1.0",
+      "maturity": "playbook",
+      "mode": "research",
+      "required_scopes": [
+        "intelligence:read"
+      ],
+      "related_skills": [
+        "company-digital-twin-analysis",
+        "evidence-verification",
+        "predictive-problem-intelligence"
+      ],
+      "path": "technology-change-detection/SKILL.md"
     }
   ]
 }

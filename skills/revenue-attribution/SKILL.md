@@ -1,27 +1,19 @@
 ---
 name: revenue-attribution
-description: Activate when linking evidence and approved GTM actions to pipeline or revenue outcomes with explicit attribution limits.
-version: 0.1.0
-maturity: contract
-mode: research
-required_scopes: ["intelligence:read"]
-related_skills: ["outbound-metrics-and-benchmarks","continuous-investigation","evidence"]
+description: Activate when tracing authorized signals through buyers, campaigns, meetings, opportunities, deals, and revenue using an explicit attribution model and complete provenance.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read"]
+  related_skills: ["outbound-metrics-and-benchmarks", "evidence-verification", "continuous-account-investigation"]
 ---
 
-# revenue attribution
+# Revenue attribution
 
-Distinguish correlation, influence, and verified revenue attribution. Do not mutate CRM or claim causal revenue impact without a defined model and complete event data.
+Trace signal, buyer, campaign, message, meeting, opportunity, deal, and revenue events only when authorized records can be joined. Return `touchpoints`, `opportunity_links`, `attributed_revenue`, `model`, `unattributed_events`, `missing_links`, `data_quality`, and `causal_limits`.
 
-## Behavior modes
+Always state whether the result is first-touch, last-touch, multi-touch, account-level influence, or another customer-declared model. Distinguish correlation, influence, and verified attribution. Do not claim causation, revenue, or campaign lift when CRM outcomes, timestamps, currency, identity joins, or model configuration are missing. Never mutate CRM records.
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
-
-## Contract
-
-- Activation: Activate when linking evidence and approved GTM actions to pipeline or revenue outcomes with explicit attribution limits.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+MCP contracts: `neyvro_get_revenue_attribution`, `neyvro_get_pipeline_metrics`, `neyvro_get_campaign_metrics`, `neyvro_get_evidence`.

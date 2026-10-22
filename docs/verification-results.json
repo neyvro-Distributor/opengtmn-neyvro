@@ -1,0 +1,69 @@
+{
+  "authentication": "BLOCKED",
+  "backend_integrations": "PARTIAL",
+  "campaign_safety": "PASS (disabled external execution)",
+  "checks": [
+    {
+      "command": [
+        "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3",
+        "scripts/validate_release.py"
+      ],
+      "exit_code": 0,
+      "name": "mandatory_skills",
+      "output_tail": "PASS mandatory skill gate: 26 required skills; 35 packaged skills",
+      "status": "PASS"
+    },
+    {
+      "command": [
+        "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3",
+        "scripts/validate_plugin.py"
+      ],
+      "exit_code": 0,
+      "name": "portable_plugin",
+      "output_tail": "Portable plugin valid: 35 skills, OAuth MCP schema valid.\nDeployment status: BLOCKED (mcp.json requires the actual deployed Neyvro HTTPS endpoint).",
+      "status": "PASS"
+    },
+    {
+      "command": [
+        "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3",
+        "-m",
+        "neyvro.skill_cli",
+        "build",
+        "--output",
+        "/tmp/neyvro-verify-build"
+      ],
+      "exit_code": 0,
+      "name": "skill_build",
+      "output_tail": "Built 35 skills",
+      "status": "PASS"
+    },
+    {
+      "command": [
+        "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "exit_code": 0,
+      "name": "test_suite",
+      "output_tail": "........................................................................ [ 51%]\n.....................................................................    [100%]\n141 passed in 3.95s",
+      "status": "PASS"
+    }
+  ],
+  "external_blockers": [
+    "No deployed HTTPS remote MCP endpoint is configured.",
+    "No production OAuth issuer/PKCE authorization service is configured.",
+    "No trusted service-to-service backend identity exchange is available.",
+    "No shared rate-limit, usage ledger, durable audit store, or idempotency store is configured.",
+    "No authenticated external-client customer-data call was executed.",
+    "No live Gmail, Microsoft, CRM, enrichment, or social provider sandbox credentials are available."
+  ],
+  "local_mcp": "PASS",
+  "mandatory_skill_count": 26,
+  "packaged_skill_count": 35,
+  "production_deployment": "NOT_TESTED",
+  "project": "neyvro-mcp",
+  "release_decision": "NO-GO",
+  "remote_mcp": "BLOCKED",
+  "remote_tool_contract_count": 56
+}

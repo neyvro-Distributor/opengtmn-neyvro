@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "neyvro",
+  "description": "Neyvro GTM and company-intelligence skills for Claude Code.",
+  "owner": {
+    "name": "Neyvro"
+  },
+  "plugins": [
+    {
+      "name": "neyvro-gtm-intelligence",
+      "description": "Evidence-backed GTM research, company intelligence, and approval-gated outreach workflows.",
+      "category": "productivity",
+      "source": ".",
+      "homepage": "https://github.com/neyvro-Distributor/opengtmn-neyvro-"
+    }
+  ]
+}

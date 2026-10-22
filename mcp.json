@@ -1,0 +1,21 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "neyvro": {
+      "type": "streamable-http",
+      "url": "https://__DEPLOYED_NEYVRO_MCP_HOST__/mcp",
+      "extensions": {
+        "com.openai": {
+          "auth": {
+            "type": "oauth",
+            "client": {
+              "mode": "dcr"
+            },
+            "baseScopes": ["intelligence:read"],
+            "defaultScopes": ["intelligence:read"]
+          }
+        }
+      }
+    }
+  }
+}

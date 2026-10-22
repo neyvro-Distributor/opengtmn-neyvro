@@ -1,0 +1,9 @@
+name: Neyvro local skills
+version: 0.1.0
+schema: v1
+mcpServers:
+  - name: local-skill-server
+    command: python3
+    args: ["-m", "neyvro.mcp_server"]
+    requestOptions:
+      timeout: 30000

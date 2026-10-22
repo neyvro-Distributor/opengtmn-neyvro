@@ -1,0 +1,14 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "neyvro-gtm-intelligence",
+  "displayName": "Neyvro GTM Intelligence",
+  "version": "0.1.0",
+  "description": "Evidence-backed GTM research, company intelligence, and approval-gated outreach workflows for Claude Code.",
+  "author": {
+    "name": "Neyvro",
+    "url": "https://github.com/neyvro-Distributor/opengtmn-neyvro-"
+  },
+  "homepage": "https://github.com/neyvro-Distributor/opengtmn-neyvro-",
+  "repository": "https://github.com/neyvro-Distributor/opengtmn-neyvro-",
+  "license": "MIT"
+}

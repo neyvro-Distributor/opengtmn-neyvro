@@ -138,6 +138,54 @@ Separate role fit from verified identity and contactability. No person or email 
 
 ---
 
+<!-- buyer-opportunity-matching/SKILL.md version 0.1.0 -->
+
+---
+name: buyer-opportunity-matching
+description: Activate when matching an evidence-backed company problem or opportunity to people likely responsible for solving, influencing, approving, or blocking it.
+license: MIT
+metadata:
+  version: 0.1.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read"]
+  related_skills: ["lead-sourcing-and-enrichment", "discovery-and-qualification", "evidence-verification"]
+---
+
+# Buyer opportunity matching
+
+Match a verified problem to buyer responsibilities and a buying committee using authorized buyer, opportunity, CRM, and evidence records. Return `matches` with role, responsibility, evidence IDs, freshness, confidence limits, and missing stakeholders. Keep decision-maker, champion, economic buyer, and influencer labels distinct.
+
+Do not guess identity, contact details, authority, or intent. Existing customers, opt-outs, suppressed contacts, and cross-tenant records remain excluded. A matched role is not a qualified opportunity. Contact enrichment and outreach remain separate permissioned workflows.
+
+MCP contracts: `neyvro_search_buyers`, `neyvro_get_opportunity_buyers`, `neyvro_get_buying_committee`, `neyvro_get_evidence`.
+
+---
+
+<!-- buying-window-detection/SKILL.md version 0.1.0 -->
+
+---
+name: buying-window-detection
+description: Activate when assessing whether verified company, leadership, technology, funding, security, hiring, or product signals justify attention now under the customer’s ICP and authorization rules.
+license: MIT
+metadata:
+  version: 0.1.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read"]
+  related_skills: ["predictive-problem-intelligence", "technology-change-detection", "evidence-verification"]
+---
+
+# Buying-window detection
+
+Explain why an opportunity may deserve attention now using fresh, relevant, multi-source evidence. Return `window_reasons`, `timing_evidence`, `counter_evidence`, `recommended_expiry`, `validation_questions`, `uncertainty`, and `status`. Do not invent budget, project dates, urgency, or intent; a signal is not a buying window by itself.
+
+Respect customer ICP, suppression, relationship, and research-budget settings. If evidence is stale, contradictory, or incomplete, downgrade the result and state what is unknown. Read-only analysis is the default; job triggers need authorization, cost budgets, and audit logs.
+
+MCP contracts: `neyvro_get_buying_windows`, `neyvro_get_company_signals`, `neyvro_get_company_timeline`, `neyvro_get_evidence`.
+
+---
+
 <!-- buying-windows/SKILL.md version 0.1.0 -->
 
 ---
@@ -279,6 +327,32 @@ Research uses authorized monitoring and public-source evidence. Alerts or outrea
 
 ---
 
+<!-- company-digital-twin-analysis/SKILL.md version 0.1.0 -->
+
+---
+name: company-digital-twin-analysis
+description: Activate when reconstructing an authorized company’s current state, historical timeline, transitions, and supporting evidence from Neyvro digital-twin data; never fill unknown fields from assumptions.
+license: MIT
+metadata:
+  version: 0.1.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read"]
+  related_skills: ["evidence-verification", "technology-change-detection", "account-research"]
+---
+
+# Company digital twin analysis
+
+Read the existing tenant-scoped digital twin, history, transitions, and source records. Return current state, material changes, timeline, evidence references, freshness, contradictions, unknown fields, and research gaps. Do not create a duplicate company database or claim a field that is not present in a verified source.
+
+Inputs: `tenant_id`, `company_id`, authorized twin snapshot, requested freshness, and optional ICP context. Outputs: `current_state`, `historical_timeline`, `transitions`, `supporting_evidence`, `observed_facts`, `inferences`, `unknowns`, `contradictions`, and `status`.
+
+Use verified observations first; label inferences and stale observations separately. Keep customer-approved ICP and access scope unchanged. Knowledge-only explanations remain available without login.
+
+MCP contracts: `neyvro_get_company_twin`, `neyvro_get_company_timeline`, `neyvro_get_company_signals`, `neyvro_get_evidence`.
+
+---
+
 <!-- content-marketing-engine/SKILL.md version 0.2.0 -->
 
 ---
@@ -362,6 +436,30 @@ These contracts are disabled without adapters. Supported adapters may include an
 - If a result cannot be verified, say `unknown` or `unavailable` and provide the research needed.
 
 See `positioning-and-messaging` for approved product claims, `seo-fundamentals` and `generative-engine-optimization` for discoverability, and `evidence` for provenance.
+
+---
+
+<!-- continuous-account-investigation/SKILL.md version 0.1.0 -->
+
+---
+name: continuous-account-investigation
+description: Activate when reviewing unresolved company questions, selecting permitted next research actions, and enforcing freshness, scope, cost, and research-budget limits for ongoing account investigation.
+license: MIT
+metadata:
+  version: 0.1.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read"]
+  related_skills: ["company-digital-twin-analysis", "evidence-verification", "negative-evidence-analysis"]
+---
+
+# Continuous account investigation
+
+Retrieve the existing investigation state and unresolved questions before proposing research. Rank permitted next actions by expected information value, evidence freshness, customer ICP relevance, cost, rate limit, and authorization. Return `unresolved_questions`, `allowed_actions`, `blocked_actions`, `budget_remaining`, `stopping_conditions`, and `status`.
+
+Do not repeatedly crawl fresh sources, run paid research without entitlement, or trigger jobs without an authorized budget and audit record. A research plan is not a completed investigation and must not fabricate findings.
+
+MCP contracts: `neyvro_get_investigation_status`, `neyvro_get_company_timeline`, `neyvro_get_evidence`, `neyvro_research_company`.
 
 ---
 
@@ -615,6 +713,30 @@ Evidence must retain source, observed time, subject, extraction context, and cor
 - Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
 - Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
 - Related skills are discovery hints, not implicit context injection.
+
+---
+
+<!-- evidence-verification/SKILL.md version 0.1.0 -->
+
+---
+name: evidence-verification
+description: Activate when checking whether a company, buyer, technology, opportunity, or revenue claim is observed, inferred, stale, contradictory, or unsupported by authorized Neyvro evidence.
+license: MIT
+metadata:
+  version: 0.1.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read"]
+  related_skills: ["evidence", "negative-evidence-analysis", "company-digital-twin-analysis"]
+---
+
+# Evidence verification
+
+Verify claims against tenant-scoped source records and preserve provenance. Distinguish `observed_fact`, `reasonable_inference`, `prediction`, `stale`, `contradictory`, and `unknown`. Report source, observed time, freshness policy, confidence limits, and what would resolve uncertainty.
+
+Inputs include claims, source evidence, freshness threshold, tenant, and optional required source class. Outputs include `verified_claims`, `inferred_claims`, `stale_evidence`, `contradictions`, `unsupported_claims`, `missing_data`, and `verification_status`. Never upgrade an inference into a fact or silently discard negative evidence.
+
+MCP contracts: `neyvro_get_evidence`, `neyvro_get_company_timeline`, `neyvro_get_company_signals`.
 
 ---
 
@@ -1558,6 +1680,30 @@ Separate absence, unknown, and contradiction. Never claim “not found” means 
 
 ---
 
+<!-- negative-evidence-analysis/SKILL.md version 0.1.0 -->
+
+---
+name: negative-evidence-analysis
+description: Activate when actively looking for verified facts, missing prerequisites, contradictions, or disqualifiers that weaken an account, buyer, opportunity, or predictive hypothesis.
+license: MIT
+metadata:
+  version: 0.1.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read"]
+  related_skills: ["evidence-verification", "buyer-opportunity-matching", "predictive-problem-intelligence"]
+---
+
+# Negative evidence analysis
+
+Seek disconfirming evidence rather than only supporting signals. Separate `observed_negative`, `missing_prerequisite`, `contradiction`, `stale_source`, `disqualifier`, and `not_observed`. Return source IDs, freshness, impact, confidence limits, and the condition that would change the conclusion.
+
+Do not treat absence of evidence as proof of absence unless the source coverage and observation window support it. Respect ICP exclusions, opt-outs, tenant boundaries, and customer-approved disqualification rules. Negative findings are read-only and never silently change customer settings.
+
+MCP contracts: `neyvro_get_negative_evidence`, `neyvro_get_evidence`, `neyvro_get_company_signals`, `neyvro_evaluate_icp_fit`.
+
+---
+
 <!-- outbound-metrics-and-benchmarks/SKILL.md version 0.2.0 -->
 
 ---
@@ -1953,6 +2099,30 @@ cold-email-writing for channel-specific copy.
 
 ---
 
+<!-- predictive-problem-intelligence/SKILL.md version 0.1.0 -->
+
+---
+name: predictive-problem-intelligence
+description: Activate when mapping verified company or technology changes to possible customer-relevant problems, while keeping hypotheses distinct from facts and respecting the customer ICP.
+license: MIT
+metadata:
+  version: 0.1.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read"]
+  related_skills: ["technology-change-detection", "ideal-customer-profile", "evidence-verification"]
+---
+
+# Predictive problem intelligence
+
+Use verified changes, approved ICP criteria, product context, and historical evidence to propose possible problems worth validating. Return each hypothesis with triggering evidence, ICP relevance, alternative explanations, uncertainty, and a validation question. Never state a predicted problem as a confirmed customer need or fabricate predictive confidence.
+
+Outputs: `problem_hypotheses`, `supporting_evidence`, `counter_evidence`, `validation_questions`, `unknowns`, `disqualifiers`, and `status`. A single weak signal cannot qualify an account. Read-only MCP access is preferred; controlled research jobs require authorization, cost budget, and audit logging.
+
+MCP contracts: `neyvro_get_company_signals`, `neyvro_get_predictive_opportunities`, `neyvro_evaluate_icp_fit`, `neyvro_get_evidence`.
+
+---
+
 <!-- predictive-problems/SKILL.md version 0.1.0 -->
 
 ---
@@ -2064,35 +2234,27 @@ See also: `cold-email-writing` for copy, `multichannel-sequences` for stop rules
 
 ---
 
-<!-- revenue-attribution/SKILL.md version 0.1.0 -->
+<!-- revenue-attribution/SKILL.md version 0.2.0 -->
 
 ---
 name: revenue-attribution
-description: Activate when linking evidence and approved GTM actions to pipeline or revenue outcomes with explicit attribution limits.
-version: 0.1.0
-maturity: contract
-mode: research
-required_scopes: ["intelligence:read"]
-related_skills: ["outbound-metrics-and-benchmarks","continuous-investigation","evidence"]
+description: Activate when tracing authorized signals through buyers, campaigns, meetings, opportunities, deals, and revenue using an explicit attribution model and complete provenance.
+license: MIT
+metadata:
+  version: 0.2.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read"]
+  related_skills: ["outbound-metrics-and-benchmarks", "evidence-verification", "continuous-account-investigation"]
 ---
 
-# revenue attribution
+# Revenue attribution
 
-Distinguish correlation, influence, and verified revenue attribution. Do not mutate CRM or claim causal revenue impact without a defined model and complete event data.
+Trace signal, buyer, campaign, message, meeting, opportunity, deal, and revenue events only when authorized records can be joined. Return `touchpoints`, `opportunity_links`, `attributed_revenue`, `model`, `unattributed_events`, `missing_links`, `data_quality`, and `causal_limits`.
 
-## Behavior modes
+Always state whether the result is first-touch, last-touch, multi-touch, account-level influence, or another customer-declared model. Distinguish correlation, influence, and verified attribution. Do not claim causation, revenue, or campaign lift when CRM outcomes, timestamps, currency, identity joins, or model configuration are missing. Never mutate CRM records.
 
-- Knowledge-only: explain principles and produce no external side effects; no Neyvro login is required.
-- Research: call only an authorized Neyvro read contract and return source, freshness, confidence, and unknowns.
-- Draft-only: create an editable proposal; do not send, publish, launch, or mutate account state.
-- External action: require authenticated workspace scope, provider permission, explicit approval, audit logging, and an idempotency key.
-
-## Contract
-
-- Activation: Activate when linking evidence and approved GTM actions to pipeline or revenue outcomes with explicit attribution limits.
-- Output: structured, reviewable Markdown or JSON with assumptions and evidence references.
-- Safety: fail closed when a provider, scope, evidence source, or approval is unavailable.
-- Related skills are discovery hints, not implicit context injection.
+MCP contracts: `neyvro_get_revenue_attribution`, `neyvro_get_pipeline_metrics`, `neyvro_get_campaign_metrics`, `neyvro_get_evidence`.
 
 ---
 
@@ -2157,3 +2319,27 @@ Provide an actionable, source-attributed SEO audit for a customer-authorized web
 These contracts are optional and disabled without an authorized adapter. Repository proposals require explicit repository access and review permissions; merge and deploy are unsupported. Do not require direct repository or DNS access for an audit.
 
 See also: `generative-engine-optimization` for answer-engine discoverability and `content-marketing-engine` for content planning.
+
+---
+
+<!-- technology-change-detection/SKILL.md version 0.1.0 -->
+
+---
+name: technology-change-detection
+description: Activate when identifying authorized, evidence-backed technology adoption, migration, engineering, or infrastructure changes and gaps between current and desired state.
+license: MIT
+metadata:
+  version: 0.1.0
+  maturity: playbook
+  mode: research
+  required_scopes: ["intelligence:read"]
+  related_skills: ["company-digital-twin-analysis", "evidence-verification", "predictive-problem-intelligence"]
+---
+
+# Technology change detection
+
+Compare observed technology state and timeline transitions with a customer-authorized desired state. Classify changes as adoption, migration, deprecation, engineering hiring or investment, security requirement, cloud expansion, or unknown. Every change must carry source IDs, observation time, freshness, and confidence.
+
+Return `changes`, `technology_gaps`, `observed_facts`, `inferences`, `unknowns`, `contradictions`, and `research_gaps`. A detected signal is not proof of a project, budget, pain, or buying intent. Do not infer technology from a job title alone, and do not crawl or alter systems without authorization.
+
+MCP contracts: `neyvro_get_company_twin`, `neyvro_get_company_signals`, `neyvro_get_company_timeline`, `neyvro_get_evidence`.

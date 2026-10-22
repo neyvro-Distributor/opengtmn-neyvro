@@ -10,11 +10,11 @@ This checklist reflects only work actually present and verified in the repositor
 | Scope-based authorization | IMPLEMENTED | `src/neyvro/models.py`, `src/neyvro/service.py` | Tenant/scope tests | None |
 | Evidence-backed company records | IMPLEMENTED | `src/neyvro/models.py`, `src/neyvro/service.py` | Evidence flow test | None |
 | Approval-gated outbound action proposal | IMPLEMENTED | `src/neyvro/models.py`, `src/neyvro/service.py` | Approval flow test | Real mailbox connector not available |
-| 27-skill contract catalog | IMPLEMENTED | `src/neyvro/skills.py` | Catalog validation test | Exact 17 OpenGTM names not supplied |
+| 35-skill contract catalog | VERIFIED | `src/neyvro/skills.py`, `assets/mandatory-skills.json` | Mandatory 26-skill gate and catalog tests | 9 legacy compatibility documents are also packaged |
 | OpenGTM reference audit | VERIFIED | `docs/opengtm-audit.md` | OpenGTM validator/build/MCP smoke checks | None |
 | Neyvro capability gap analysis | VERIFIED | `docs/neyvro-gap-analysis.md`, `docs/skill-coverage.md` | Neyvro API suite: 1046 passed | External plugin contracts remain |
 | Portable plugin integration contracts | IMPLEMENTED | `docs/integration-contracts.md`, `docs/implementation-roadmap.md` | Contract review only | Gateway and client adapters not implemented |
-| Canonical 27-skill library | IMPLEMENTED | `skills/*/SKILL.md`, `src/neyvro/skill_library.py` | `tests/test_skill_library.py` | Playbook content remains contract-phase |
+| Canonical 35-skill library | IMPLEMENTED | `skills/*/SKILL.md`, `src/neyvro/skill_library.py` | `tests/test_skill_library.py` | Specialized intelligence modules are read-only and adapter-bounded |
 | Skill registry, loader, search, and validator CLI | VERIFIED | `src/neyvro/skill_library.py`, `src/neyvro/skill_cli.py` | 10 skill tests passed | None |
 | Deterministic manifests and bundle | VERIFIED | `index.json`, `llms.txt`, `dist/neyvro-skills.md` | Determinism test and CLI build | None |
 | Skill CI checks and fixtures | IMPLEMENTED | `.github/workflows/skills.yml`, `tests/fixtures/**` | Local pytest and validation | Remote GitHub runner not executed here |
@@ -34,11 +34,11 @@ This checklist reflects only work actually present and verified in the repositor
 | `generative-engine-optimization` substantive playbook | VERIFIED | `skills/generative-engine-optimization/SKILL.md`, `skills/generative-engine-optimization/integration.json`, `src/neyvro/geo.py` | `tests/test_geo.py` | Optional crawler/visibility/repository adapters unavailable; bounded audit only |
 | `content-marketing-engine` substantive playbook | VERIFIED | `skills/content-marketing-engine/SKILL.md`, `skills/content-marketing-engine/integration.json`, `src/neyvro/content_marketing.py` | `tests/test_content_marketing.py` | Optional channel/calendar adapters unavailable; drafting and proposal workflows only |
 | `outbound-metrics-and-benchmarks` substantive playbook | VERIFIED | `skills/outbound-metrics-and-benchmarks/SKILL.md`, `skills/outbound-metrics-and-benchmarks/integration.json`, `src/neyvro/outbound_metrics.py` | `tests/test_outbound_metrics.py` | Campaign, CRM, revenue, and signal adapters unavailable; bounded local aggregation only |
-| Local knowledge MCP server | NOT STARTED | — | — | MCP SDK/protocol contract not supplied |
-| Remote Streamable HTTP MCP server | BLOCKED | — | — | Hosting, domain and auth provider required |
-| OAuth and customer identity integration | BLOCKED | — | — | Identity provider and client credentials required |
+| Local knowledge MCP server | VERIFIED | `src/neyvro/mcp_server.py`, `README.md`, `docs/mcp-local-server.md`, `examples/mcp/neyvro-local-skills.json` | `tests/test_mcp_server.py` | Customer-data execution MCP remains separate |
+| Remote Streamable HTTP MCP server | PARTIAL | `src/neyvro/remote_mcp.py`, `docs/remote-mcp-readiness.md` | `tests/test_remote_mcp.py`, local initialize/tools-list smoke test | Provider deployment and trusted backend adapter required |
+| OAuth and customer identity integration | PARTIAL | `src/neyvro/remote_mcp.py` | JWT verifier tests and fail-closed readiness checks | Identity provider, PKCE authorization service, and Firebase/session tenant exchange required |
 | Company research and contact integrations | BLOCKED | — | — | Authorized provider credentials and API contracts required |
 | Cross-tenant production authorization tests | IMPLEMENTED | `src/neyvro/service.py` | Tenant isolation test | Production identity integration pending |
 | Duplicate-send and reply-stop workflows | NOT STARTED | — | — | Mailbox provider and event contract required |
-| Plugin manifests for Codex/Claude/Cursor/ChatGPT | NOT STARTED | — | — | Client-specific manifest contracts required |
-| Docker and CI deployment | NOT STARTED | — | — | Runtime/deployment target not supplied |
+| Plugin manifests for Codex/Claude/Cursor/ChatGPT | IMPLEMENTED | `plugin.json`, `.codex-plugin/`, `.claude-plugin/`, `.cursor/`, `docs/client-compatibility.md` | Plugin and compatibility tests | Live authenticated client calls remain BLOCKED |
+| Docker and CI deployment | PARTIAL | `.github/workflows/skills.yml`, `Makefile`, `scripts/verify_all.py` | Local verification gate | Production hosting target and deployment credentials not supplied |

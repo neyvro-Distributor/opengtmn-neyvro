@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "neyvro": {
+      "type": "http",
+      "url": "${NEYVRO_MCP_URL}"
+    }
+  }
+}

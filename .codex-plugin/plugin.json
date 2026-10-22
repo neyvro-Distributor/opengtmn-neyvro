@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "neyvro-gtm-intelligence",
+  "version": "0.1.0",
+  "description": "Codex compatibility manifest for the Neyvro GTM and intelligence plugin.",
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/gtm-automation-with-neyvro/SKILL.md"
+    }
+  }
+}

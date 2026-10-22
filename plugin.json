@@ -1,0 +1,33 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "neyvro-gtm-intelligence",
+  "version": "0.1.0",
+  "description": "Portable Neyvro GTM and company-intelligence skills with an authenticated MCP connection.",
+  "author": {
+    "name": "Neyvro",
+    "url": "https://github.com/neyvro-Distributor/opengtmn-neyvro-"
+  },
+  "repository": "https://github.com/neyvro-Distributor/opengtmn-neyvro-",
+  "license": "MIT",
+  "keywords": ["gtm", "sales", "company-intelligence", "research", "mcp"],
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/gtm-automation-with-neyvro/SKILL.md",
+      "interface": {
+        "displayName": "Neyvro GTM Intelligence",
+        "shortDescription": "Evidence-backed GTM research and planning",
+        "longDescription": "Use Neyvro skills to research companies, understand buying signals, plan GTM work, and prepare approval-gated outreach workflows.",
+        "developerName": "Neyvro",
+        "category": "Productivity",
+        "capabilities": ["Read", "Draft", "Propose"],
+        "defaultPrompt": [
+          "Use Neyvro to find my strongest company opportunities.",
+          "Research this prospect using Neyvro.",
+          "Prepare an evidence-backed outbound campaign.",
+          "Show me who replied to my outreach."
+        ],
+        "websiteURL": "https://github.com/neyvro-Distributor/opengtmn-neyvro-"
+      }
+    }
+  }
+}

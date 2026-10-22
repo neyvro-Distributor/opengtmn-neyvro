@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "neyvro": {
+      "serverUrl": "https://__DEPLOYED_NEYVRO_MCP_HOST__/mcp"
+    }
+  }
+}

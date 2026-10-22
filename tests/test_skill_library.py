@@ -10,10 +10,10 @@ ROOT = Path(__file__).parents[1]
 SKILLS = ROOT / "skills"
 
 
-def test_canonical_library_has_expected_27_skills() -> None:
+def test_canonical_library_has_expected_35_skills() -> None:
     skills = discover(SKILLS)
-    assert len(skills) == 27
-    assert len({skill.name for skill in skills}) == 27
+    assert len(skills) == 35
+    assert len({skill.name for skill in skills}) == 35
     assert all(len(skill.version.split(".")) == 3 for skill in skills)
 
 
@@ -37,7 +37,7 @@ def test_build_is_deterministic(tmp_path: Path) -> None:
     first = build(SKILLS, tmp_path)
     second = build(SKILLS, tmp_path)
     assert first == second
-    assert json.loads((tmp_path / "index.json").read_text())['count'] == 27
+    assert json.loads((tmp_path / "index.json").read_text())['count'] == 35
     assert (tmp_path / "dist/neyvro-skills.md").is_file()
 
 

@@ -161,6 +161,90 @@ This file records the work implemented in this repository so the project history
 - Added discovery contracts for `neyvro_get_capabilities`, `neyvro_get_connections`, `neyvro_get_permissions`, and `neyvro_get_approval_status`, plus `integration.json`.
 - Expanded the canonical registry from 26 to 27 skills and added tests for disconnected, invalid-auth, insufficient-scope, unavailable-service, pending-approval, approved-gate, secret-redaction, native-tool mapping, and disabled-adapter states.
 
+### 2026-10-23 — Company intelligence and predictive GTM skills
+
+- Added nine specialized skills: `company-digital-twin-analysis`, `technology-change-detection`, `predictive-problem-intelligence`, `evidence-verification`, `buying-window-detection`, `buyer-opportunity-matching`, `continuous-account-investigation`, `negative-evidence-analysis`, and `revenue-attribution`.
+- Added valid skill metadata, activation conditions, inputs/outputs, evidence and uncertainty rules, authorization boundaries, MCP contracts, and per-skill integration manifests.
+- Added `src/neyvro/intelligence_skills.py` with tenant-scoped read-only twin analysis, stale/conflicting evidence handling, hypothesis-only prediction, buying-window checks, buyer matching, budgeted investigation planning, negative evidence, attribution limits, and fail-closed adapters.
+- Expanded the canonical registry from 27 to 35 skills and extended the Neyvro GTM automation map. Revenue attribution was upgraded in place; the eight missing specialized skill directories were added. Added tests for supported, conflicting, missing, stale, unauthorized, budget-limited, cross-tenant, and incomplete revenue evidence.
+
+### 2026-10-23 — Local Neyvro Skills MCP server
+
+- Added `src/neyvro/mcp_server.py` using the official Python MCP SDK `FastMCP` stdio transport; no handwritten JSON-RPC parser and no customer-data execution service.
+- Exposed `neyvro_list_skills`, `neyvro_get_skill`, and `neyvro_search_skills`, plus bounded `neyvro://skills/<skill-name>` resources and one prompt per canonical skill.
+- Added installable `neyvro-mcp-skills` entry point, `README.md`, `docs/mcp-local-server.md`, and `examples/mcp/neyvro-local-skills.json` with startup and client configuration instructions.
+- Added a real local `ClientSession` protocol test for tools/list, tools/call, resources/list, resources/read, prompts/list, prompts/get, exact content, argument validation, unknown skills, and 35 registrations. Public skills work without Neyvro login and no filesystem paths or private records are exposed.
+
+### 2026-10-23 — Remote Streamable HTTP MCP boundary
+
+- Added `src/neyvro/remote_mcp.py` with the official MCP SDK Streamable HTTP transport, 56 requested tool contracts, Pydantic schemas, explicit READ/RESEARCH/DRAFT/PROPOSE/APPROVE/EXECUTE/PUBLISH modes, scope gates, tenant checks, bounded pagination, approval checks, safe errors, backend adapter isolation, and fail-closed readiness states.
+- Added `neyvro-mcp-remote` packaging entrypoint and `docs/remote-mcp-readiness.md` documenting startup, OAuth/JWT requirements, provider-assigned HTTPS hosting, tool statuses, backend blockers, and security work required before public customer-data exposure.
+- Added `tests/test_remote_mcp.py` covering catalog uniqueness, anonymous access, tenant mismatch, missing scopes, pending approval, SSRF literal-address rejection, inbound-token non-forwarding, and transport registration.
+- Verification: 8 focused remote MCP tests passed; an elevated Uvicorn smoke test completed the MCP initialize handshake and `tools/list` over `http://127.0.0.1:8765/mcp` (56 tools). The live backend adapter remains disabled because the existing backend uses Firebase-to-session-cookie auth and lacks the trusted OAuth tenant exchange.
+
+### 2026-10-23 — Portable Neyvro Agent Plugin package
+
+- Added the current Agent Plugins 1.0.0 package layout: root `plugin.json`, OAuth-configured `mcp.json`, `.codex-plugin/plugin.json` compatibility overlay, `assets/skill-inventory.json`, and asset documentation.
+- Packaged all 35 current skill directories: 17 OpenGTM-equivalent workflows, 9 Neyvro-exclusive intelligence skills, and 9 legacy compatibility documents. The Neyvro-native automation skill is the supported bridge; the Chronos-named document is retained only for compatibility.
+- Added `scripts/install-codex-skills.sh` for explicit installation into a supported local Codex skills directory and `scripts/validate_plugin.py` for manifest, OAuth, path, inventory, YAML/frontmatter, related-reference, and credential checks.
+- Added [docs/agent-plugin.md](docs/agent-plugin.md) and updated `README.md` with current Codex CLI MCP commands, OAuth setup, ChatGPT custom MCP/plugin testing, local skill installation, sample requests, and public submission limitations.
+- Verification: plugin validator passed with 35 skills and correctly reports deployment `BLOCKED` because no deployed Neyvro HTTPS endpoint exists in the workspace; Codex CLI discovery and 35-skill installation smoke test passed; plugin tests passed (3), full suite remains passing (132 expected after test collection).
+
+### 2026-10-23 — Claude Code plugin integration
+
+- Added `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` using the current Claude Code plugin and marketplace layouts. The plugin reuses the exact canonical root `skills/` directory; it does not create a second skill tree.
+- Added `README-CLAUDE.md` with Git marketplace installation, update/uninstall, local checkout validation, remote OAuth MCP setup, local stdio MCP setup, offline behavior, safe approval boundaries, and sample Neyvro requests.
+- Added Claude MCP examples at `examples/claude/neyvro-local.mcp.json` and `examples/claude/neyvro-remote.mcp.json`; the remote example uses `${NEYVRO_MCP_URL}` and contains no credentials.
+- Verification: installed Claude Code `2.1.273`; `claude plugin validate .claude-plugin/plugin.json` and `claude plugin validate .` passed; Claude-specific package tests passed (4); skill/plugin validation and `git diff --check` passed. Remote OAuth and read-only customer-data calls remain blocked until a real deployed Neyvro endpoint and identity provider are available. `claude mcp list` was not treated as a package failure because this installation health-checks unrelated configured MCP servers and exceeded the command timeout.
+
+### 2026-10-23 — Cross-agent plugin and MCP compatibility
+
+- Implemented: Cursor installation guidance, a Cursor MCP example, and documented compatibility paths for Windsurf/Devin Cascade, Cline, Continue, Zed, VS Code GitHub Copilot Agent mode, Gemini CLI, and generic MCP clients.
+- Files: `.cursor/mcp.json.example`, `docs/cursor-installation.md`, `docs/client-compatibility.md`, `docs/other-agents.md`, `examples/client-configurations/`, and `tests/test_client_compatibility.py`.
+- Verification: all client JSON/YAML fixtures parse; compatibility tests passed (5); full pytest suite passed (138); `scripts/validate_plugin.py` passed with 35 skills and correctly reported the missing deployed HTTPS endpoint.
+- Notes: the root `plugin.json`, `mcp.json`, and `skills/` remain canonical. Cursor and other newly documented clients are `DOCUMENTED_ONLY`; no OAuth credentials or fictional production URL were added. Remote customer-data execution remains blocked until deployment and identity-provider setup.
+
+### 2026-10-23 — Release engineering and public-readiness audit
+
+- Implemented: mandatory 26-skill release inventory/gate, substantive-content checks, MCP Registry metadata draft, changelog, security policy, contribution policy, and release/security/MCP/skill/publication reports.
+- Files: `assets/mandatory-skills.json`, `scripts/validate_release.py`, `.mcp/server.json`, `CHANGELOG.md`, `SECURITY.md`, `CONTRIBUTING.md`, and `docs/{skill-coverage-report,mcp-test-report,security-audit,publication-status,release-readiness}.md`.
+- Verification: mandatory gate passed (26 required, 35 packaged); portable plugin validation passed; official MCP Registry `2025-12-11` schema validation passed; `PYTHONPATH=src python3 -m neyvro.skill_cli build` passed; full pytest passed (141); `git diff --check` passed.
+- Notes: final public release is NO-GO. No deployed HTTPS remote endpoint, OAuth issuer, trusted backend identity exchange, shared rate/usage/audit controls, complete two-tenant workflow, or authenticated external-client read call is available. Local knowledge MCP is the only verified runnable distribution surface.
+
+### 2026-10-23 — Deep MCP audit and verification gate
+
+- Implemented: six missing remote MCP contract tools (`neyvro_get_monitoring_status`, `neyvro_get_opportunity_history`, `neyvro_get_buying_window`, `neyvro_evaluate_icp_fit`, `neyvro_get_contact_verification`, and `neyvro_list_campaigns`), public skill resources/prompts on the remote server, and the `make verify-all` completeness command.
+- Files: `src/neyvro/remote_mcp.py`, `tests/test_remote_mcp.py`, `scripts/verify_all.py`, `Makefile`, `docs/COMPLETE_GAP_AUDIT.md`, `docs/ARCHITECTURE_VERIFICATION.md`, `docs/BACKEND_INTEGRATION_MAP.md`, `docs/TEST_EVIDENCE.md`, `docs/VERIFICATION_RESULTS.md`, and `docs/EXTERNAL_BLOCKERS.md`.
+- Verification: 56 remote tool contracts, 35 remote public skill resources/prompts, mandatory 26-skill gate passed, and full suite passed (141 tests).
+- Notes: remote customer-data functionality remains BLOCKED/PARTIAL without deployment, OAuth/PKCE, trusted backend identity exchange, shared controls, and provider sandboxes. Final release decision remains NO-GO.
+
+### 2026-10-23 — Real E2E connection audit
+
+- Implemented: `make test-e2e`, local HTTP health verification, and the complete `docs/e2e/` evidence set covering initial audit, protocol, skills, remote endpoint, OAuth, Codex, ChatGPT, cross-client comparison, security, blockers, and next steps.
+- Verification: local remote app started on loopback and returned a real `/health` response; Codex CLI `0.163.0` was inspected and has no Neyvro entry; `make test-e2e` passed all repository checks with 141 tests.
+- Notes: no real Codex private-tool call or ChatGPT custom-MCP conversation was claimed. Both remain BLOCKED/NOT_TESTED because no deployed HTTPS endpoint, OAuth provider, or backend credentials exist. MCP Inspector package resolution also remained NOT_TESTED.
+
+### 2026-10-23 — Production unblocking audit
+
+- Implemented: validated the Render Docker Blueprint, added the production deployment container/configuration, and completed the independent backend and repository verification gates.
+- Files: `Dockerfile`, `.dockerignore`, `render.yaml`, `pyproject.toml`, `docs/e2e/REMOTE_ENDPOINT_RESULTS.md`, and `docs/e2e/BLOCKERS.md`.
+- Verification: backend targeted suite passed 225 tests; Neyvro MCP suite passed 141 tests; `make verify-all` passed all local checks; plugin and release validators passed; Render Blueprint validation passed.
+- Notes: production remains NO-GO. Render has no deployed Neyvro service, no public HTTPS MCP endpoint, no production OAuth/PKCE issuer, and no trusted backend service-identity exchange. Docker image build was not completed because the Docker daemon was unavailable. No broad push or deployment was performed.
+
+### 2026-10-23 — Production blocker report
+
+- Implemented: added the required production unblock, OAuth, backend-auth-bridge, Render, Codex, ChatGPT, and release-readiness reports.
+- Files: `docs/PRODUCTION_UNBLOCK_REPORT.md`, `docs/OAUTH_INTEGRATION_RESULTS.md`, `docs/BACKEND_AUTH_BRIDGE.md`, `docs/RENDER_DEPLOYMENT_RESULTS.md`, `docs/CODEX_LIVE_TEST.md`, `docs/CHATGPT_LIVE_TEST.md`, and `docs/RELEASE_READINESS.md`.
+- Verification: reports are grounded in the actual local test results, backend inspection, Render account inspection, and Codex CLI inspection; no external deployment or authentication was fabricated.
+- Notes: the remaining blockers require authorized identity-provider configuration, backend changes, and a scoped deployment release.
+
+### 2026-10-23 — Live production deployment audit
+
+- Implemented: added the final live-deployment, OAuth, backend-auth, Render, Codex, ChatGPT, security, and beta-readiness reports.
+- Files: `docs/PRODUCTION_DEPLOYMENT_REPORT.md`, `docs/OAUTH_VERIFICATION.md`, `docs/BACKEND_AUTH_INTEGRATION.md`, `docs/RENDER_SERVICE_STATUS.md`, `docs/CODEX_CONNECTION_TEST.md`, `docs/CHATGPT_CONNECTION_TEST.md`, `docs/SECURITY_TEST_RESULTS.md`, and `docs/CUSTOMER_BETA_READINESS.md`.
+- Verification: the current Render CLI was checked once and returned an expired-token `401`; no deployment command was attempted. Local security and regression findings are separated from production-unverified checks.
+- Notes: customer beta remains NO-GO until the owner reconnects Render, provisions OAuth/PKCE, and supplies the backend trust integration.
+
 ## Future entries
 
 When implementing new work, add an entry using this format:

@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: mcp-gateway
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    plan: free
+    envVars:
+      - key: NEYVRO_MCP_ENABLE_EXECUTION
+        value: "false"
+      - key: NEYVRO_MCP_REQUESTS_PER_MINUTE
+        value: "60"
+      - key: NEYVRO_MCP_BACKEND_TIMEOUT_SECONDS
+        value: "10"

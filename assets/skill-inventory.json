@@ -1,0 +1,28 @@
+{
+  "portable_core_skills": [
+    "gtm-strategy", "ideal-customer-profile", "positioning-and-messaging",
+    "account-research", "lead-sourcing-and-enrichment", "cold-email-writing",
+    "email-deliverability", "linkedin-outreach", "multichannel-sequences",
+    "outreach-personalization", "reply-handling-and-objections",
+    "discovery-and-qualification", "seo-fundamentals",
+    "generative-engine-optimization", "content-marketing-engine",
+    "outbound-metrics-and-benchmarks", "gtm-automation-with-neyvro"
+  ],
+  "neyvro_exclusive_intelligence_skills": [
+    "company-digital-twin-analysis", "technology-change-detection",
+    "predictive-problem-intelligence", "evidence-verification",
+    "buying-window-detection", "buyer-opportunity-matching",
+    "continuous-account-investigation", "negative-evidence-analysis",
+    "revenue-attribution"
+  ],
+  "legacy_compatibility_skills": [
+    "buyer-matching", "buying-windows", "company-changes",
+    "continuous-investigation", "digital-twins", "evidence",
+    "gtm-automation-with-chronos", "negative-evidence", "predictive-problems"
+  ],
+  "notes": [
+    "All current canonical skill directories are packaged for compatibility.",
+    "The Chronos-named legacy skill is retained as a compatibility document; the Neyvro-native automation skill is the supported entrypoint.",
+    "The remote endpoint marker in mcp.json must be replaced with an actual deployed HTTPS endpoint before installation."
+  ]
+}

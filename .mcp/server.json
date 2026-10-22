@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.neyvro-Distributor/neyvro-mcp",
+  "title": "Neyvro MCP",
+  "description": "Neyvro's tenant-scoped GTM and company-intelligence MCP service.",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/neyvro-Distributor/opengtmn-neyvro-",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://__DEPLOYED_NEYVRO_MCP_HOST__/mcp"
+    }
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "releaseStatus": "not-published",
+      "authentication": "oauth"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "required_open_gtm_equivalent": [
+    "gtm-strategy",
+    "ideal-customer-profile",
+    "positioning-and-messaging",
+    "account-research",
+    "lead-sourcing-and-enrichment",
+    "cold-email-writing",
+    "email-deliverability",
+    "linkedin-outreach",
+    "multichannel-sequences",
+    "outreach-personalization",
+    "reply-handling-and-objections",
+    "discovery-and-qualification",
+    "seo-fundamentals",
+    "generative-engine-optimization",
+    "content-marketing-engine",
+    "outbound-metrics-and-benchmarks",
+    "gtm-automation-with-neyvro"
+  ],
+  "required_neyvro_exclusive": [
+    "company-digital-twin-analysis",
+    "technology-change-detection",
+    "predictive-problem-intelligence",
+    "evidence-verification",
+    "buying-window-detection",
+    "buyer-opportunity-matching",
+    "continuous-account-investigation",
+    "negative-evidence-analysis",
+    "revenue-attribution"
+  ]
+}

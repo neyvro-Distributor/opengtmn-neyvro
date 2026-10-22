@@ -11,7 +11,7 @@ def principal(tenant_id: str, *scopes: Scope) -> Principal:
 
 def test_skill_catalog_has_all_contracts() -> None:
     validate_catalog()
-    assert len(SKILLS) == 27
+    assert len(SKILLS) == 35
 
 
 def test_tenant_isolation_and_scope_enforcement() -> None:

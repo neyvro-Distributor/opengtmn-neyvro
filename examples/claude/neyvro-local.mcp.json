@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "neyvro-local": {
+      "command": "python3",
+      "args": ["-m", "neyvro.mcp_server"],
+      "env": {
+        "PYTHONPATH": "/absolute/path/to/opengtmn-neyvro-/src"
+      }
+    }
+  }
+}

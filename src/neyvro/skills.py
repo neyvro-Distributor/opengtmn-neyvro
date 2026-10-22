@@ -27,7 +27,7 @@ SKILLS: tuple[SkillContract, ...] = canonical_contracts()
 
 def validate_catalog() -> None:
     canonical = canonical_contracts()
-    if len(canonical) != 27 or len({skill.name for skill in canonical}) != 27:
-        raise ValueError("skill catalog must contain 27 unique contracts")
+    if len(canonical) != 35 or len({skill.name for skill in canonical}) != 35:
+        raise ValueError("skill catalog must contain 35 unique contracts")
     if any(not skill.name or not skill.description for skill in canonical):
         raise ValueError("every skill requires metadata and instructions")

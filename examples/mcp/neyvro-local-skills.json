@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "neyvro-local-skills": {
+      "command": "/absolute/path/to/venv/bin/neyvro-mcp-skills",
+      "args": []
+    }
+  }
+}

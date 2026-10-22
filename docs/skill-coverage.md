@@ -24,6 +24,15 @@ claimed to exist until the corresponding files are added and validated.
 | `outbound-metrics-and-benchmarks` | `neyvro-outbound-analytics` | operations metrics; campaign/send/reply aggregates; explicit denominators | PARTIAL |
 | `gtm-automation-with-chronos` | `gtm-automation-with-neyvro` compatibility bridge | Neyvro MCP capability discovery; approval and scope contract; no Chronos tool proxy | IMPLEMENTED plugin bridge |
 | `gtm-automation-with-neyvro` | `gtm-automation-with-neyvro` | `neyvro_get_capabilities`, `neyvro_get_connections`, `neyvro_get_permissions`, `neyvro_get_approval_status`; server-side gates for named services | IMPLEMENTED plugin bridge |
+| `company-digital-twin-analysis` | `company-digital-twin-analysis` | `neyvro_get_company_twin`, `neyvro_get_company_timeline`, `neyvro_get_company_signals`, `neyvro_get_evidence` | IMPLEMENTED plugin / read-only adapter |
+| `technology-change-detection` | `technology-change-detection` | company twin, signals, timeline, evidence | IMPLEMENTED plugin / read-only adapter |
+| `predictive-problem-intelligence` | `predictive-problem-intelligence` | signals, predictive opportunities, ICP fit, evidence | IMPLEMENTED plugin / hypothesis-only |
+| `evidence-verification` | `evidence-verification` | evidence, timeline, signals | IMPLEMENTED plugin / read-only adapter |
+| `buying-window-detection` | `buying-window-detection` | buying windows, signals, timeline, evidence | IMPLEMENTED plugin / read-only adapter |
+| `buyer-opportunity-matching` | `buyer-opportunity-matching` | buyer search, opportunity buyers, buying committee, evidence | IMPLEMENTED plugin / read-only adapter |
+| `continuous-account-investigation` | `continuous-account-investigation` | investigation status, timeline, evidence, bounded company research | IMPLEMENTED plugin / job gated |
+| `negative-evidence-analysis` | `negative-evidence-analysis` | negative evidence, evidence, signals, ICP fit | IMPLEMENTED plugin / read-only adapter |
+| `revenue-attribution` | `revenue-attribution` | revenue attribution, pipeline, campaign metrics, evidence | IMPLEMENTED plugin / read-only adapter |
 
 ## Mapping rule
 

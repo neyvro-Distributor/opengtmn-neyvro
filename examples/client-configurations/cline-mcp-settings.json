@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "neyvro": {
+      "type": "streamableHttp",
+      "url": "https://__DEPLOYED_NEYVRO_MCP_HOST__/mcp",
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
