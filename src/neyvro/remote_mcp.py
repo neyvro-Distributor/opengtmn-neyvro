@@ -236,6 +236,38 @@ class CompanySearchResponse(BaseModel):
     companies: list[Company]
 
 
+@dataclass(frozen=True)
+class ToolAdapter:
+    """Allowlisted AWS adapter contract for one MCP operation."""
+
+    tool_name: str
+    operation: str
+    method: str
+    path: str
+    scope: str
+    output_model: type[BaseModel]
+    side_effects: str
+    credit_spending: bool
+    provider_requirements: tuple[str, ...] = ()
+    feature_flag: str = "NEYVRO_MCP_BRIDGE_ENABLED"
+    timeout_seconds: float = 10.0
+    retry_policy: str = "no retries; GET only and one exchange per invocation"
+
+
+ADAPTER_REGISTRY: dict[str, ToolAdapter] = {
+    "neyvro_search_companies": ToolAdapter(
+        tool_name="neyvro_search_companies",
+        operation=BRIDGE_OPERATION,
+        method="GET",
+        path="/v1/mcp/companies",
+        scope=BRIDGE_PERMISSION,
+        output_model=CompanySearchResponse,
+        side_effects="read-only; transaction is rolled back by AWS",
+        credit_spending=False,
+    ),
+}
+
+
 class BackendClient:
     def __init__(self) -> None:
         self.base_url = os.getenv("NEYVRO_MCP_API_BASE_URL", "").rstrip("/")
@@ -303,8 +335,11 @@ class BackendClient:
         return default, []
 
     async def request(self, spec: ToolSpec, request: ToolRequest, identity: NeyvroAccessToken) -> dict[str, Any]:
+        adapter = ADAPTER_REGISTRY.get(spec.name)
+        if adapter is None or adapter.operation != spec.operation or adapter.path != spec.path or adapter.method != spec.method:
+            raise BackendDisabled("This Neyvro tool has no supported AWS adapter")
         assertion = self._assertion(identity, spec, request)
-        timeout = httpx.Timeout(self.timeout)
+        timeout = httpx.Timeout(min(self.timeout, adapter.timeout_seconds))
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
             exchange = await client.post(f"{self.base_url}/v1/integrations/mcp/exchange", headers={"Authorization": f"Bearer {assertion}", "Accept": "application/json"})
             if exchange.status_code != 200:
@@ -329,15 +364,17 @@ class BackendClient:
             params = {"page": request.page, "page_size": request.page_size}
             if request.query is not None:
                 params["query"] = request.query
-            response = await client.get(f"{self.base_url}{spec.path}", params=params, headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"})
+            if adapter.method != "GET":
+                raise BridgeConfigurationError("unsupported adapter method")
+            response = await client.get(f"{self.base_url}{adapter.path}", params=params, headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"})
             if response.status_code != 200:
                 code, workspaces = self._error_code(response, "company_search_failed")
                 raise BridgeHTTPError(response.status_code, code, workspaces)
             try:
-                result = CompanySearchResponse.model_validate(response.json())
+                result = adapter.output_model.model_validate(response.json())
             except (ValidationError, ValueError, TypeError):
                 raise BridgeHTTPError(502, "malformed_company_response")
-            if result.workspace_id != workspace_id or result.operation != BRIDGE_OPERATION:
+            if result.workspace_id != workspace_id or result.operation != adapter.operation:
                 raise BridgeHTTPError(502, "invalid_company_response")
             return {"status": "available", "data": result.model_dump(mode="json")}
 
@@ -495,7 +532,7 @@ def _firebase_config() -> tuple[str | None, str | None, list[str]]:
     return project, resource, allowed_hosts
 
 
-ENABLED_PRIVATE_TOOLS = frozenset({"neyvro_search_companies"})
+ENABLED_PRIVATE_TOOLS = frozenset(ADAPTER_REGISTRY)
 
 
 def _auth_context(spec: ToolSpec, request: ToolRequest) -> tuple[NeyvroAccessToken | None, dict[str, Any]]:
