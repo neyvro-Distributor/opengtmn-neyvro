@@ -186,8 +186,11 @@ class JWTVerifier:
                 return None
             signing_key = await __import__("asyncio").to_thread(self.client.get_signing_key_from_jwt, token)
             claims = jwt.decode(token, signing_key.key, algorithms=["RS256"], issuer=self.issuer, audience=self.audience, options={"require": ["exp", "iat", "iss", "aud", "sub"], "verify_signature": True}, leeway=5)
+            subject = claims.get("sub")
+            if not isinstance(subject, str) or not subject.strip():
+                return None
             tenant = claims.get("workspace_id") or claims.get("tenant_id")
-            if tenant is not None and (not isinstance(tenant, str) or not tenant):
+            if tenant is not None and (not isinstance(tenant, str) or not tenant.strip()):
                 return None
             raw_scopes = claims.get("scope", claims.get("scp", []))
             if isinstance(raw_scopes, str):
@@ -197,7 +200,7 @@ class JWTVerifier:
             else:
                 return None
             _AUTH_VERIFIED = True
-            return NeyvroAccessToken(token=hashlib.sha256(token.encode()).hexdigest(), client_id=str(claims["sub"]), scopes=scopes, expires_at=int(claims["exp"]), resource=self.resource_url, tenant_id=tenant)
+            return NeyvroAccessToken(token=hashlib.sha256(token.encode()).hexdigest(), client_id=subject, scopes=scopes, expires_at=int(claims["exp"]), resource=self.resource_url, tenant_id=tenant)
         except (jwt.PyJWTError, ValueError, TypeError, KeyError, OSError):
             return None
 

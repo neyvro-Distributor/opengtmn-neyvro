@@ -95,6 +95,18 @@ def test_jwt_verifier_rejects_wrong_issuer_expiry_signature_and_malformed_scopes
     assert asyncio.run(verifier.verify_token(malformed_scopes)) is None
 
 
+def test_jwt_verifier_rejects_missing_or_blank_subject():
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    verifier = remote_mcp.JWTVerifier("https://issuer.example", "neyvro-mcp", "https://issuer.example/jwks", "https://mcp.example/mcp")
+    verifier.client.get_signing_key_from_jwt = lambda _token: type("Key", (), {"key": private_key.public_key()})()
+    base = {"iss": "https://issuer.example", "aud": "neyvro-mcp", "iat": int(time.time()), "exp": int(time.time()) + 300, "scope": "intelligence:read"}
+
+    for subject in (None, "", "   "):
+        claims = {**base, "sub": subject} if subject is not None else base
+        token = jwt.encode(claims, private_key, algorithm="RS256")
+        assert asyncio.run(verifier.verify_token(token)) is None
+
+
 def test_missing_workspace_is_verified_but_not_private_authorization():
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     verifier = remote_mcp.JWTVerifier("https://issuer.example", "neyvro-mcp", "https://issuer.example/jwks", "https://mcp.example/mcp")
