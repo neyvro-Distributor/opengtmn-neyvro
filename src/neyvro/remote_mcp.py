@@ -13,8 +13,10 @@ import ipaddress
 import json
 import logging
 import os
+import re
 import sys
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from enum import StrEnum
@@ -28,7 +30,7 @@ from mcp.server.auth.provider import AccessToken, TokenVerifier
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
@@ -41,6 +43,12 @@ SKILLS_ROOT = Path(__file__).resolve().parents[2] / "skills"
 MAX_SKILL_BYTES = 256 * 1024
 MAX_PUBLIC_SKILL_NAME_LENGTH = 128
 MAX_PUBLIC_LIST_LIMIT = 100
+BRIDGE_OPERATION = "companies.search"
+BRIDGE_PERMISSION = "intelligence:read"
+BRIDGE_DEFAULT_ISSUER = "neyvro-mcp-gateway"
+BRIDGE_DEFAULT_AUDIENCE = "neyvro-mcp-exchange"
+BRIDGE_DEFAULT_KID = "gw-1"
+BRIDGE_LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
 class ToolMode(StrEnum):
@@ -54,9 +62,12 @@ class ToolMode(StrEnum):
 
 
 class NeyvroAccessToken(AccessToken):
-    """Verified SDK token with request-scoped tenant identity."""
+    """Verified Firebase identity plus untrusted-until-AWS workspace grants."""
 
     tenant_id: str | None = None
+    firebase_uid: str = ""
+    email_verified: bool = False
+    client_name: str | None = None
 
 
 class ToolRequest(BaseModel):
@@ -68,8 +79,23 @@ class ToolRequest(BaseModel):
     campaign_id: str | None = Field(default=None, min_length=1, max_length=128)
     page: int = Field(default=1, ge=1, le=10000)
     page_size: int = Field(default=25, ge=1, le=MAX_PAGE_SIZE)
+    query: str | None = Field(default=None, max_length=100)
     approval_id: str | None = Field(default=None, min_length=1, max_length=256)
     payload: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("workspace_id")
+    @classmethod
+    def _workspace_uuid(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        try:
+            parsed = uuid.UUID(value)
+        except ValueError as exc:
+            raise ValueError("workspace_id must be a UUID") from exc
+        if value != str(parsed) or value.lower() != value:
+            raise ValueError("workspace_id must be a lowercase UUID")
+        return value
+
 
 
 @dataclass(frozen=True)
@@ -85,14 +111,15 @@ class ToolSpec:
     description: str = ""
     required_fields: tuple[str, ...] = ()
     estimated_cost: float = 0.0
+    operation: str | None = None
 
 
-def _spec(name: str, group: str, mode: ToolMode = ToolMode.READ, scopes: tuple[str, ...] = ("intelligence:read",), path: str | None = None, method: str = "GET", *, approval_required: bool = False, readiness: str = "DISABLED", required_fields: tuple[str, ...] = (), description: str = "") -> ToolSpec:
-    return ToolSpec(name, group, mode, scopes, path, method, approval_required, readiness, description or f"{mode.value.title()} {group.lower()} data through Neyvro authorization gates.", required_fields)
+def _spec(name: str, group: str, mode: ToolMode = ToolMode.READ, scopes: tuple[str, ...] = ("intelligence:read",), path: str | None = None, method: str = "GET", *, approval_required: bool = False, readiness: str = "DISABLED", required_fields: tuple[str, ...] = (), description: str = "", operation: str | None = None) -> ToolSpec:
+    return ToolSpec(name, group, mode, scopes, path, method, approval_required, readiness, description or f"{mode.value.title()} {group.lower()} data through Neyvro authorization gates.", required_fields, operation=operation)
 
 
 TOOL_SPECS: tuple[ToolSpec, ...] = (
-    _spec("neyvro_search_companies", "company intelligence", ToolMode.READ, path="/v1/discovery", readiness="PARTIAL"),
+    _spec("neyvro_search_companies", "company intelligence", ToolMode.READ, scopes=(BRIDGE_PERMISSION,), path="/v1/mcp/companies", readiness="AVAILABLE", operation=BRIDGE_OPERATION, description="Read workspace-scoped Discovery companies without starting research or spending credits."),
     _spec("neyvro_get_company_twin", "company intelligence", path="/v1/discovery/companies/{company_id}", readiness="PARTIAL", required_fields=("company_id",)),
     _spec("neyvro_get_company_timeline", "company intelligence", path="/v1/discovery/companies/{company_id}", readiness="PARTIAL", required_fields=("company_id",)),
     _spec("neyvro_get_company_signals", "company intelligence", path="/v1/discovery/companies/{company_id}", readiness="PARTIAL", required_fields=("company_id",)),
@@ -161,17 +188,158 @@ class BackendDisabled(Exception):
     pass
 
 
+class BridgeConfigurationError(Exception):
+    pass
+
+
+class BridgeHTTPError(Exception):
+    def __init__(self, status_code: int, code: str, workspaces: list[dict[str, str]] | None = None) -> None:
+        super().__init__(code)
+        self.status_code = status_code
+        self.code = code
+        self.workspaces = workspaces or []
+
+
+class CompanyReason(BaseModel):
+    tone: str
+    text: str
+
+
+class Company(BaseModel):
+    company_id: str
+    rank: int
+    name: str
+    domain: str
+    score: int | float
+    fit: int | float
+    timing: int | float
+    evidence: int | float
+    label: str
+    verdict: str | None
+    status: str
+    tracked: bool
+    pipeline_stage: str
+    is_new: bool
+    summary: str
+    why_now: str
+    reasons: list[CompanyReason]
+    assessed_at: str
+
+
+class CompanySearchResponse(BaseModel):
+    workspace_id: str
+    operation: str
+    query: str | None
+    page: int
+    page_size: int
+    total: int
+    companies: list[Company]
+
+
 class BackendClient:
     def __init__(self) -> None:
-        self.base_url = os.getenv("NEYVRO_MCP_BACKEND_URL", "").rstrip("/")
-        self.service_token = os.getenv("NEYVRO_MCP_BACKEND_SERVICE_TOKEN", "")
+        self.base_url = os.getenv("NEYVRO_MCP_API_BASE_URL", "").rstrip("/")
+        self.gateway_private_key = os.getenv("NEYVRO_MCP_GATEWAY_PRIVATE_KEY", "").replace("\\n", "\n")
+        self.gateway_kid = os.getenv("NEYVRO_MCP_GATEWAY_KEY_ID", BRIDGE_DEFAULT_KID)
+        self.gateway_issuer = BRIDGE_DEFAULT_ISSUER
+        self.exchange_audience = BRIDGE_DEFAULT_AUDIENCE
         self.timeout = float(os.getenv("NEYVRO_MCP_BACKEND_TIMEOUT_SECONDS", "10"))
+        self.enabled = os.getenv("NEYVRO_MCP_BRIDGE_ENABLED", "false").lower() == "true"
+        self.client_name = os.getenv("NEYVRO_MCP_CLIENT_NAME", "neyvro-render")
 
-    async def request(self, spec: ToolSpec, request: ToolRequest, tenant_id: str) -> dict[str, Any]:
-        # Do not activate this path from environment presence alone. The
-        # current AWS service-token + tenant-header arrangement is not a
-        # delegated identity bridge and cannot authorize customer data.
-        raise BackendDisabled("backend identity bridge is not deployed")
+    def _validate_configuration(self) -> None:
+        if not self.enabled:
+            raise BackendDisabled("NEYVRO MCP tools are unavailable")
+        if not self.base_url:
+            raise BridgeConfigurationError("NEYVRO_MCP_API_BASE_URL is not configured")
+        parsed = urlparse(self.base_url)
+        if parsed.username or parsed.password or parsed.fragment or not parsed.hostname:
+            raise BridgeConfigurationError("NEYVRO_MCP_API_BASE_URL is invalid")
+        if parsed.scheme != "https" and parsed.hostname not in BRIDGE_LOCAL_HOSTS:
+            raise BridgeConfigurationError("NEYVRO_MCP_API_BASE_URL must use HTTPS")
+        if not self.gateway_private_key:
+            raise BridgeConfigurationError("NEYVRO_MCP_GATEWAY_PRIVATE_KEY is not configured")
+        if self.gateway_kid not in {"gw-1", "gw-test-1"}:
+            raise BridgeConfigurationError("gateway key id is not permitted")
+
+    def _assertion(self, identity: NeyvroAccessToken, spec: ToolSpec, request: ToolRequest) -> str:
+        self._validate_configuration()
+        if spec.operation != BRIDGE_OPERATION:
+            raise BridgeConfigurationError("operation is not enabled")
+        now = int(time.time())
+        claims: dict[str, Any] = {
+            "iss": self.gateway_issuer,
+            "aud": self.exchange_audience,
+            "sub": identity.firebase_uid,
+            "email_verified": identity.email_verified,
+            "op": spec.operation,
+            "scope": BRIDGE_PERMISSION,
+            "iat": now,
+            "exp": now + 60,
+            "jti": str(uuid.uuid4()),
+            "client": self.client_name,
+        }
+        if request.workspace_id:
+            claims["workspace_id"] = request.workspace_id
+        if not isinstance(self.client_name, str) or len(self.client_name) > 64 or not re.fullmatch(r"[a-z0-9._-]+", self.client_name):
+            claims.pop("client", None)
+        try:
+            return jwt.encode(claims, self.gateway_private_key, algorithm="ES256", headers={"alg": "ES256", "typ": "gateway+jwt", "kid": self.gateway_kid})
+        except (jwt.PyJWTError, TypeError, ValueError) as exc:
+            raise BridgeConfigurationError("gateway signing key is unusable") from exc
+
+    @staticmethod
+    def _error_code(response: httpx.Response, default: str) -> tuple[str, list[dict[str, str]]]:
+        try:
+            body = response.json()
+            detail = body.get("detail", {}) if isinstance(body, dict) else {}
+            code = detail.get("code") if isinstance(detail, dict) else None
+            workspaces = detail.get("workspaces", []) if isinstance(detail, dict) else []
+            if isinstance(code, str) and isinstance(workspaces, list):
+                safe = [item for item in workspaces if isinstance(item, dict) and all(isinstance(item.get(k), str) for k in ("id", "name", "role"))]
+                return code, safe
+        except (ValueError, TypeError):
+            pass
+        return default, []
+
+    async def request(self, spec: ToolSpec, request: ToolRequest, identity: NeyvroAccessToken) -> dict[str, Any]:
+        assertion = self._assertion(identity, spec, request)
+        timeout = httpx.Timeout(self.timeout)
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+            exchange = await client.post(f"{self.base_url}/v1/integrations/mcp/exchange", headers={"Authorization": f"Bearer {assertion}", "Accept": "application/json"})
+            if exchange.status_code != 200:
+                code, workspaces = self._error_code(exchange, "bridge_exchange_failed")
+                raise BridgeHTTPError(exchange.status_code, code, workspaces)
+            try:
+                exchanged = exchange.json()
+                access_token = exchanged["access_token"]
+                if exchanged.get("token_type") != "Bearer" or not isinstance(access_token, str) or not access_token:
+                    raise ValueError
+                if exchanged.get("operation") != BRIDGE_OPERATION or exchanged.get("expires_in") != 60:
+                    raise ValueError
+                uuid.UUID(exchanged["exchange_id"])
+                workspace = exchanged["workspace"]
+                workspace_id = workspace["id"]
+                if not isinstance(workspace_id, str) or not isinstance(workspace.get("name"), str):
+                    raise ValueError
+                if not isinstance(exchanged.get("scopes"), list) or BRIDGE_PERMISSION not in exchanged["scopes"]:
+                    raise ValueError
+            except (KeyError, TypeError, ValueError):
+                raise BridgeHTTPError(502, "malformed_exchange_response")
+            params = {"page": request.page, "page_size": request.page_size}
+            if request.query is not None:
+                params["query"] = request.query
+            response = await client.get(f"{self.base_url}{spec.path}", params=params, headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"})
+            if response.status_code != 200:
+                code, workspaces = self._error_code(response, "company_search_failed")
+                raise BridgeHTTPError(response.status_code, code, workspaces)
+            try:
+                result = CompanySearchResponse.model_validate(response.json())
+            except (ValidationError, ValueError, TypeError):
+                raise BridgeHTTPError(502, "malformed_company_response")
+            if result.workspace_id != workspace_id or result.operation != BRIDGE_OPERATION:
+                raise BridgeHTTPError(502, "invalid_company_response")
+            return {"status": "available", "data": result.model_dump(mode="json")}
 
 
 class JWTVerifier:
@@ -200,9 +368,54 @@ class JWTVerifier:
             else:
                 return None
             _AUTH_VERIFIED = True
-            return NeyvroAccessToken(token=hashlib.sha256(token.encode()).hexdigest(), client_id=subject, scopes=scopes, expires_at=int(claims["exp"]), resource=self.resource_url, tenant_id=tenant)
+            email_verified = claims.get("email_verified", False)
+            if not isinstance(email_verified, bool):
+                return None
+            return NeyvroAccessToken(token=hashlib.sha256(token.encode()).hexdigest(), client_id=subject, scopes=scopes, expires_at=int(claims["exp"]), resource=self.resource_url, tenant_id=tenant, firebase_uid=subject, email_verified=email_verified, client_name=claims.get("client") if isinstance(claims.get("client"), str) else None)
         except (jwt.PyJWTError, ValueError, TypeError, KeyError, OSError):
             return None
+
+
+class FirebaseTokenVerifier(JWTVerifier):
+    """RS256 Firebase ID-token verifier with optional Admin revocation check."""
+
+    def __init__(self, project_id: str, resource_url: str, *, admin_verifier: Callable[..., dict[str, Any]] | None = None) -> None:
+        self.project_id = project_id
+        self.admin_verifier = admin_verifier
+        super().__init__(
+            f"https://securetoken.google.com/{project_id}",
+            project_id,
+            "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com",
+            resource_url,
+        )
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        verified = await super().verify_token(token)
+        if verified is None:
+            return None
+        try:
+            # The signature/issuer/audience checks have already succeeded in
+            # the parent verifier; this only enforces Firebase's required
+            # authentication timestamp on the verified claims.
+            claims = jwt.decode(token, options={"verify_signature": False})
+            auth_time = claims.get("auth_time")
+            if isinstance(auth_time, bool) or not isinstance(auth_time, (int, float)) or auth_time > time.time() + 5:
+                return None
+        except (jwt.PyJWTError, TypeError, ValueError):
+            return None
+        if self.admin_verifier is not None:
+            try:
+                claims = await __import__("asyncio").to_thread(self.admin_verifier, token, check_revoked=True)
+                if not isinstance(claims, dict) or claims.get("sub") != verified.firebase_uid:
+                    return None
+                # Admin verification is the authority for revocation/disabled state;
+                # crypto and Firebase issuer/audience checks were already enforced.
+                verified.email_verified = claims.get("email_verified") is True
+                if not verified.email_verified:
+                    return None
+            except Exception:  # fail closed on Firebase outage or revoked account
+                return None
+        return verified
 
 
 class RateLimiter:
@@ -254,24 +467,52 @@ def _oauth_config() -> tuple[str | None, str | None, str | None, str | None, lis
     return _https_url(issuer, "NEYVRO_MCP_OAUTH_ISSUER"), audience.strip(), _https_url(jwks, "NEYVRO_MCP_OAUTH_JWKS_URL"), _https_url(resource, "NEYVRO_MCP_RESOURCE_URL"), allowed_hosts
 
 
-def _auth_context(spec: ToolSpec, request: ToolRequest) -> tuple[str | None, dict[str, Any]]:
+def _firebase_admin_verifier() -> Callable[..., dict[str, Any]] | None:
+    """Build the Admin SDK verifier only from protected service-account config."""
+    credential_json = os.getenv("NEYVRO_MCP_FIREBASE_SERVICE_ACCOUNT_JSON", "")
+    if not credential_json:
+        return None
+    try:
+        import firebase_admin
+        from firebase_admin import auth, credentials
+
+        try:
+            app = firebase_admin.get_app("neyvro-mcp")
+        except ValueError:
+            app = firebase_admin.initialize_app(credentials.Certificate(json.loads(credential_json)), name="neyvro-mcp")
+        return lambda token, check_revoked=True: auth.verify_id_token(token, app=app, check_revoked=check_revoked)
+    except Exception as exc:
+        LOGGER.error("Firebase Admin configuration is unusable: %s", type(exc).__name__)
+        return None
+
+
+def _firebase_config() -> tuple[str | None, str | None, list[str]]:
+    project = os.getenv("NEYVRO_MCP_FIREBASE_PROJECT_ID", "").strip() or None
+    resource = os.getenv("NEYVRO_MCP_RESOURCE_URL", "").strip() or None
+    if resource:
+        resource = _https_url(resource, "NEYVRO_MCP_RESOURCE_URL")
+    allowed_hosts = [host.strip() for host in os.getenv("NEYVRO_MCP_ALLOWED_HOSTS", "").split(",") if host.strip()]
+    return project, resource, allowed_hosts
+
+
+ENABLED_PRIVATE_TOOLS = frozenset({"neyvro_search_companies"})
+
+
+def _auth_context(spec: ToolSpec, request: ToolRequest) -> tuple[NeyvroAccessToken | None, dict[str, Any]]:
     token = get_access_token()
-    # The SDK context contains only a token returned by JWTVerifier. Tenant
-    # identity comes from that verified token, never from request data or a
-    # process-global claims object.
-    tenant = getattr(token, "tenant_id", None) if token else None
-    if token is None:
-        return None, {"status": "unauthorized", "error": {"code": "missing_or_invalid_oauth", "message": "A valid OAuth bearer token with a tenant claim is required."}}
-    if not tenant:
-        return None, {"status": "unauthorized", "error": {"code": "tenant_context_unavailable", "message": "The verified identity has no trusted workspace claim; backend authorization is not available."}}
+    # Firebase identity proves only who is calling. AWS decides workspace
+    # membership, role, operation and permission during this request's exchange.
+    if not isinstance(token, NeyvroAccessToken):
+        return None, {"status": "unauthorized", "error": {"code": "missing_or_invalid_identity", "message": "A verified Firebase identity is required."}}
+    if spec.name not in ENABLED_PRIVATE_TOOLS:
+        return None, {"status": "disabled", "error": {"code": "operation_not_available", "message": "This Neyvro tool is not enabled."}, "readiness": "DISABLED"}
     missing = sorted(set(spec.scopes) - set(token.scopes))
     if missing:
         return None, {"status": "insufficient_scope", "missing_scopes": missing, "error": {"code": "missing_scope", "message": "The token does not grant this tool."}}
-    if request.workspace_id and request.workspace_id != tenant:
-        return None, {"status": "forbidden", "error": {"code": "tenant_mismatch", "message": "The requested workspace is outside the token tenant."}}
-    if not LIMITER.allow(tenant, spec.name):
+    limiter_key = token.firebase_uid or token.client_id
+    if not LIMITER.allow(limiter_key, spec.name):
         return None, {"status": "rate_limited", "error": {"code": "rate_limit_exceeded", "message": "Retry after the rate-limit window."}}
-    return tenant, {}
+    return token, {}
 
 
 def _safe_website_url(payload: dict[str, Any]) -> None:
@@ -293,10 +534,10 @@ def _safe_website_url(payload: dict[str, Any]) -> None:
 
 
 async def handle_tool(spec: ToolSpec, request: ToolRequest) -> dict[str, Any]:
-    tenant, failure = _auth_context(spec, request)
+    identity, failure = _auth_context(spec, request)
     if failure:
         return failure
-    assert tenant is not None
+    assert identity is not None
     try:
         for field in spec.required_fields:
             if not getattr(request, field, None):
@@ -304,11 +545,36 @@ async def handle_tool(spec: ToolSpec, request: ToolRequest) -> dict[str, Any]:
         _safe_website_url(request.payload)
         if spec.approval_required and not request.approval_id:
             return {"status": "pending_approval", "error": {"code": "approval_required", "message": "The exact customer-approved action ID is required."}}
-        result = await BACKEND.request(spec, request, tenant)
-        LOGGER.info(json.dumps({"event": "mcp_tool", "tool": spec.name, "tenant": tenant, "status": result.get("status")}, sort_keys=True))
+        result = await BACKEND.request(spec, request, identity)
+        LOGGER.info(json.dumps({"event": "mcp_tool", "tool": spec.name, "status": result.get("status")}, sort_keys=True))
         return result
     except BackendDisabled as exc:
         return {"status": "disabled", "error": {"code": "capability_unavailable", "message": str(exc)}, "readiness": spec.readiness}
+    except BridgeConfigurationError:
+        return {"status": "disabled", "error": {"code": "bridge_unavailable", "message": "The Neyvro tools are unavailable."}, "readiness": "DISABLED"}
+    except BridgeHTTPError as exc:
+        if exc.code == "choose_workspace":
+            return {"status": "workspace_selection_required", "error": {"code": exc.code, "message": "Select one of the available workspaces.", "workspaces": exc.workspaces}}
+        messages = {
+            "unknown_user": "The person does not have a Neyvro account.",
+            "email_unverified": "Verify the account email before using Neyvro tools.",
+            "scope_not_granted": "The required Neyvro permission was not granted.",
+            "workspace_forbidden": "The selected workspace is not available.",
+            "no_workspace": "No active Neyvro workspace is available.",
+            "not_a_member": "Workspace membership is no longer active.",
+            "user_disabled": "The Neyvro account is disabled.",
+            "account_inactive": "The Neyvro workspace is inactive.",
+            "rate_limited": "Neyvro rate limit reached; retry after the supplied delay.",
+        }
+        if exc.status_code in {401, 403}:
+            status = "unauthorized" if exc.status_code == 401 else "forbidden"
+        elif exc.status_code == 429:
+            status = "rate_limited"
+        elif exc.status_code == 422:
+            status = "invalid_request"
+        else:
+            status = "backend_unavailable"
+        return {"status": status, "error": {"code": exc.code, "message": messages.get(exc.code, "The Neyvro backend did not authorize this request.")}}
     except (httpx.TimeoutException, httpx.HTTPError):
         return {"status": "backend_unavailable", "error": {"code": "provider_timeout_or_failure", "message": "The Neyvro backend did not complete the request."}}
     except ValueError as exc:
@@ -382,12 +648,33 @@ def _tool_handler(spec: ToolSpec) -> Callable[..., Any]:
 
 
 def build_server() -> FastMCP:
+    firebase_project, firebase_resource, firebase_hosts = _firebase_config()
     try:
         issuer, audience, jwks, resource_url, allowed_hosts = _oauth_config()
     except ValueError as exc:
         LOGGER.error("invalid OAuth configuration: %s", exc)
         issuer = audience = jwks = resource_url = None
         allowed_hosts = []
+    if firebase_project and firebase_resource:
+        # The Admin SDK is mandatory for the Firebase compatibility mode: a
+        # cryptographically valid but revoked/disabled ID token is not enough.
+        admin_verifier = _firebase_admin_verifier()
+        if admin_verifier is not None:
+            issuer, audience, jwks, resource_url = (
+                f"https://securetoken.google.com/{firebase_project}",
+                firebase_project,
+                "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com",
+                firebase_resource,
+            )
+            allowed_hosts = firebase_hosts
+            verifier: TokenVerifier | None = FirebaseTokenVerifier(firebase_project, firebase_resource, admin_verifier=admin_verifier)
+        else:
+            issuer = audience = jwks = resource_url = None
+            verifier = None
+    elif issuer and audience and jwks and resource_url:
+        verifier = JWTVerifier(issuer, audience, jwks, resource_url)
+    else:
+        verifier = None
     allowed_origins = [origin.strip() for origin in os.getenv("NEYVRO_MCP_ALLOWED_ORIGINS", "").split(",") if origin.strip()]
     kwargs: dict[str, Any] = {
         "name": "neyvro-remote",
@@ -398,12 +685,13 @@ def build_server() -> FastMCP:
             allowed_origins=allowed_origins,
         ),
     }
-    if issuer and audience and jwks and resource_url:
-        verifier = JWTVerifier(issuer, audience, jwks, resource_url)
+    if verifier is not None and issuer and audience and resource_url:
         kwargs["token_verifier"] = verifier
         kwargs["auth"] = AuthSettings(issuer_url=issuer, resource_server_url=resource_url, required_scopes=[])
     server = FastMCP(**kwargs)
     for spec in TOOL_SPECS:
+        if spec.name not in ENABLED_PRIVATE_TOOLS:
+            continue
         server.add_tool(_tool_handler(spec), name=spec.name, description=spec.description, structured_output=True, meta={"readiness": spec.readiness, "mode": spec.mode.value, "required_scopes": list(spec.scopes), "approval_required": spec.approval_required, "backend_path": spec.path})
     # These two tools intentionally do not call _auth_context and do not have
     # backend paths. They expose only the canonical public skill library.
@@ -469,25 +757,41 @@ def readiness_report() -> dict[str, Any]:
     except ValueError as exc:
         oauth_complete = False
         oauth_error = str(exc)
-    if oauth_error:
-        authentication = "BLOCKED"
-    elif _AUTH_VERIFIED:
+    firebase_project = bool(os.getenv("NEYVRO_MCP_FIREBASE_PROJECT_ID"))
+    firebase_credentials = bool(os.getenv("NEYVRO_MCP_FIREBASE_SERVICE_ACCOUNT_JSON"))
+    if _AUTH_VERIFIED:
         authentication = "VERIFIED"
+    elif firebase_project and firebase_credentials:
+        authentication = "CONFIGURED"
+    elif oauth_error:
+        authentication = "BLOCKED"
     elif oauth_complete:
         authentication = "CONFIGURED"
     else:
         authentication = "BLOCKED"
-    # A static gateway token plus X-Neyvro-Tenant is not an identity bridge.
-    # Keep the adapter disabled until AWS deploys the delegated assertion
-    # contract documented in BACKEND_AUTH_BRIDGE.md.
+    bridge_configured = bool(BACKEND.base_url and BACKEND.gateway_private_key)
+    bridge_enabled = BACKEND.enabled and bridge_configured
+    workspace_authorization = "REQUESTED_PER_CALL" if bridge_enabled else "BLOCKED"
+    adapter = "READY" if bridge_enabled else "DISABLED"
+    tool_states = {spec.name: ("AVAILABLE" if spec.name in ENABLED_PRIVATE_TOOLS and bridge_enabled else "DISABLED") for spec in TOOL_SPECS}
     notes = [
-        "OAuth configuration is not proof of token verification; VERIFIED is set only after a real token passes signature, issuer, audience, expiry, subject, tenant, and scope validation.",
-        "The backend adapter remains disabled until the AWS delegated identity bridge is deployed; an incoming MCP token is never forwarded.",
-        "Process-local rate limits and cost controls are not sufficient for multi-instance production without a shared store.",
+        "Authentication configuration is not proof of identity; VERIFIED is set only after a Firebase token passes RS256, issuer, audience, time, subject, and Admin SDK revocation checks.",
+        "Workspace authorization is resolved by AWS on every exchange; Firebase claims never prove membership.",
+        "The adapter is off by default and never forwards an incoming Firebase token.",
     ]
     if oauth_error:
         notes.insert(0, oauth_error)
-    return {"authentication": authentication, "customer_data_authorization": "BLOCKED", "backend_service_adapter": "DISABLED", "tools": {spec.name: "DISABLED" for spec in TOOL_SPECS}, "notes": notes}
+    return {
+        "authentication_configuration": "CONFIGURED" if (firebase_project and firebase_credentials) or oauth_complete else "BLOCKED",
+        "verified_identity": authentication,
+        "workspace_authorization": workspace_authorization,
+        "aws_adapter_readiness": adapter,
+        "authentication": authentication,
+        "customer_data_authorization": workspace_authorization,
+        "backend_service_adapter": adapter,
+        "tools": tool_states,
+        "notes": notes,
+    }
 
 
 REMOTE_SERVER = build_server()
