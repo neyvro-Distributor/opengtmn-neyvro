@@ -1,7 +1,10 @@
 import asyncio
+import time
 
 import pytest
 from mcp.server.auth.provider import AccessToken
+import jwt
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from neyvro import remote_mcp
 
@@ -40,15 +43,47 @@ def test_unconfigured_readiness_is_not_verified():
     assert set(report["tools"].values()) == {"DISABLED"}
 
 
+def test_oauth_configuration_is_configured_not_verified(monkeypatch):
+    monkeypatch.setenv("NEYVRO_MCP_OAUTH_ISSUER", "https://issuer.example")
+    monkeypatch.setenv("NEYVRO_MCP_OAUTH_AUDIENCE", "neyvro-mcp")
+    monkeypatch.setenv("NEYVRO_MCP_OAUTH_JWKS_URL", "https://issuer.example/.well-known/jwks.json")
+    monkeypatch.setenv("NEYVRO_MCP_RESOURCE_URL", "https://mcp.example/mcp")
+    monkeypatch.setattr(remote_mcp, "_AUTH_VERIFIED", False)
+    assert remote_mcp.readiness_report()["authentication"] == "CONFIGURED"
+
+
+def test_jwt_verifier_enforces_signature_issuer_audience_and_tenant(monkeypatch):
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    verifier = remote_mcp.JWTVerifier("https://issuer.example", "neyvro-mcp", "https://issuer.example/jwks", "https://mcp.example/mcp")
+    verifier.client.get_signing_key_from_jwt = lambda _token: type("Key", (), {"key": private_key.public_key()})()
+    claims = {"iss": "https://issuer.example", "aud": "neyvro-mcp", "sub": "user-a", "workspace_id": "tenant-a", "scope": "intelligence:read", "iat": int(time.time()), "exp": int(time.time()) + 300}
+    token = jwt.encode(claims, private_key, algorithm="RS256")
+    verified = asyncio.run(verifier.verify_token(token))
+    assert isinstance(verified, remote_mcp.NeyvroAccessToken)
+    assert verified.tenant_id == "tenant-a"
+    assert verified.scopes == ["intelligence:read"]
+
+    bad_audience = jwt.encode({**claims, "aud": "wrong-resource"}, private_key, algorithm="RS256")
+    assert asyncio.run(verifier.verify_token(bad_audience)) is None
+
+
+def test_configured_server_publishes_protected_resource_metadata(monkeypatch):
+    monkeypatch.setenv("NEYVRO_MCP_OAUTH_ISSUER", "https://issuer.example")
+    monkeypatch.setenv("NEYVRO_MCP_OAUTH_AUDIENCE", "neyvro-mcp")
+    monkeypatch.setenv("NEYVRO_MCP_OAUTH_JWKS_URL", "https://issuer.example/.well-known/jwks.json")
+    monkeypatch.setenv("NEYVRO_MCP_RESOURCE_URL", "https://mcp.example/mcp")
+    app = remote_mcp.build_server().streamable_http_app()
+    assert any("oauth-protected-resource" in getattr(route, "path", "") for route in app.routes)
+
+
 def test_anonymous_and_cross_tenant_requests_are_rejected(monkeypatch):
     spec = remote_mcp.SPEC_BY_NAME["neyvro_get_company_twin"]
     request = remote_mcp.ToolRequest(company_id="company-a")
     monkeypatch.setattr(remote_mcp, "get_access_token", lambda: None)
     assert asyncio.run(remote_mcp.handle_tool(spec, request))["status"] == "unauthorized"
 
-    token = AccessToken(token="opaque", client_id="user-a", scopes=["intelligence:read"])
+    token = remote_mcp.NeyvroAccessToken(token="opaque", client_id="user-a", scopes=["intelligence:read"], resource="https://mcp.example/mcp", tenant_id="tenant-a")
     monkeypatch.setattr(remote_mcp, "get_access_token", lambda: token)
-    remote_mcp.AUTH_CLAIMS.set({"tenant_id": "tenant-a"})
     request = remote_mcp.ToolRequest(workspace_id="tenant-b", company_id="company-a")
     assert asyncio.run(remote_mcp.handle_tool(spec, request))["status"] == "forbidden"
 
@@ -78,13 +113,12 @@ def test_public_skill_rate_limit_is_fail_closed(monkeypatch):
 
 
 def test_missing_scope_and_pending_approval_are_enforced(monkeypatch):
-    token = AccessToken(token="opaque", client_id="user-a", scopes=[])
+    token = remote_mcp.NeyvroAccessToken(token="opaque", client_id="user-a", scopes=[], resource="https://mcp.example/mcp", tenant_id="tenant-a")
     monkeypatch.setattr(remote_mcp, "get_access_token", lambda: token)
-    remote_mcp.AUTH_CLAIMS.set({"tenant_id": "tenant-a"})
     read_spec = remote_mcp.SPEC_BY_NAME["neyvro_get_company_twin"]
     assert asyncio.run(remote_mcp.handle_tool(read_spec, remote_mcp.ToolRequest(company_id="c")))["status"] == "insufficient_scope"
 
-    token = AccessToken(token="opaque", client_id="user-a", scopes=["intelligence:read", "proposals:write"])
+    token = remote_mcp.NeyvroAccessToken(token="opaque", client_id="user-a", scopes=["intelligence:read", "proposals:write"], resource="https://mcp.example/mcp", tenant_id="tenant-a")
     monkeypatch.setattr(remote_mcp, "get_access_token", lambda: token)
     proposal = remote_mcp.SPEC_BY_NAME["neyvro_propose_campaign"]
     result = asyncio.run(remote_mcp.handle_tool(proposal, remote_mcp.ToolRequest(campaign_id="c")))
@@ -92,9 +126,8 @@ def test_missing_scope_and_pending_approval_are_enforced(monkeypatch):
 
 
 def test_private_website_targets_are_rejected_before_backend(monkeypatch):
-    token = AccessToken(token="opaque", client_id="user-a", scopes=["intelligence:read"])
+    token = remote_mcp.NeyvroAccessToken(token="opaque", client_id="user-a", scopes=["intelligence:read"], resource="https://mcp.example/mcp", tenant_id="tenant-a")
     monkeypatch.setattr(remote_mcp, "get_access_token", lambda: token)
-    remote_mcp.AUTH_CLAIMS.set({"tenant_id": "tenant-a"})
     spec = remote_mcp.SPEC_BY_NAME["neyvro_analyze_website"]
     request = remote_mcp.ToolRequest(payload={"url": "http://127.0.0.1:8000/admin"})
     result = asyncio.run(remote_mcp.handle_tool(spec, request))
@@ -104,9 +137,8 @@ def test_private_website_targets_are_rejected_before_backend(monkeypatch):
 
 
 def test_backend_adapter_never_uses_inbound_token(monkeypatch):
-    token = AccessToken(token="incoming-secret", client_id="user-a", scopes=["intelligence:read"])
+    token = remote_mcp.NeyvroAccessToken(token="incoming-secret", client_id="user-a", scopes=["intelligence:read"], resource="https://mcp.example/mcp", tenant_id="tenant-a")
     monkeypatch.setattr(remote_mcp, "get_access_token", lambda: token)
-    remote_mcp.AUTH_CLAIMS.set({"tenant_id": "tenant-a"})
     spec = remote_mcp.SPEC_BY_NAME["neyvro_get_company_twin"]
     captured = {}
 

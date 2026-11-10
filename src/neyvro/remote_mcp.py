@@ -8,7 +8,6 @@ is required before an adapter can call the existing API.
 
 from __future__ import annotations
 
-import contextvars
 import hashlib
 import ipaddress
 import json
@@ -36,7 +35,6 @@ from starlette.routing import Route
 from .skill_library import SkillValidationError, discover as discover_skills, load as load_skill
 
 LOGGER = logging.getLogger("neyvro.remote_mcp")
-AUTH_CLAIMS: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar("neyvro_mcp_auth_claims", default={})
 MAX_PAGE_SIZE = 100
 MAX_BODY_BYTES = 512 * 1024
 SKILLS_ROOT = Path(__file__).resolve().parents[2] / "skills"
@@ -53,6 +51,12 @@ class ToolMode(StrEnum):
     APPROVE = "APPROVE"
     EXECUTE = "EXECUTE"
     PUBLISH = "PUBLISH"
+
+
+class NeyvroAccessToken(AccessToken):
+    """Verified SDK token with request-scoped tenant identity."""
+
+    tenant_id: str | None = None
 
 
 class ToolRequest(BaseModel):
@@ -164,43 +168,37 @@ class BackendClient:
         self.timeout = float(os.getenv("NEYVRO_MCP_BACKEND_TIMEOUT_SECONDS", "10"))
 
     async def request(self, spec: ToolSpec, request: ToolRequest, tenant_id: str) -> dict[str, Any]:
-        if not self.base_url or not self.service_token or not spec.path or spec.readiness == "DISABLED":
-            raise BackendDisabled("backend adapter is not configured or this capability is unavailable")
-        if spec.mode in {ToolMode.EXECUTE, ToolMode.PUBLISH, ToolMode.APPROVE} and os.getenv("NEYVRO_MCP_ENABLE_EXECUTION") != "true":
-            raise BackendDisabled("execution is disabled until the approval-capable backend adapter is enabled")
-        path = spec.path.format(**request.model_dump())
-        params = {key: value for key, value in {"workspace_id": tenant_id, "page": request.page, "page_size": request.page_size}.items() if value is not None}
-        body = request.payload
-        headers = {"Authorization": f"Bearer {self.service_token}", "X-Neyvro-Tenant": tenant_id, "X-Neyvro-MCP": "remote"}
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=self.timeout, follow_redirects=False) as client:
-            response = await client.request(spec.method, path, params=params if spec.method == "GET" else None, json=body if spec.method != "GET" else None, headers=headers)
-        if response.status_code >= 400:
-            safe_body = response.text[:500] if response.headers.get("content-type", "").startswith("text/") else "backend request failed"
-            return {"status": "backend_error", "error": {"code": f"backend_http_{response.status_code}", "message": safe_body}}
-        try:
-            data = response.json()
-        except ValueError:
-            data = {"raw": response.text[:MAX_BODY_BYTES]}
-        return {"status": "available", "data": data, "tenant_scope": tenant_id, "source": "neyvro-backend"}
+        # Do not activate this path from environment presence alone. The
+        # current AWS service-token + tenant-header arrangement is not a
+        # delegated identity bridge and cannot authorize customer data.
+        raise BackendDisabled("backend identity bridge is not deployed")
 
 
 class JWTVerifier:
-    def __init__(self, issuer: str, audience: str, jwks_url: str) -> None:
-        self.issuer, self.audience, self.jwks_url = issuer, audience, jwks_url
-        self.client = jwt.PyJWKClient(jwks_url)
+    def __init__(self, issuer: str, audience: str, jwks_url: str, resource_url: str) -> None:
+        self.issuer, self.audience, self.jwks_url, self.resource_url = issuer, audience, jwks_url, resource_url
+        self.client = jwt.PyJWKClient(jwks_url, cache_jwk_set=True, lifespan=300)
 
     async def verify_token(self, token: str) -> AccessToken | None:
+        global _AUTH_VERIFIED
         try:
-            signing_key = self.client.get_signing_key_from_jwt(token).key
-            claims = jwt.decode(token, signing_key, algorithms=["RS256"], issuer=self.issuer, audience=self.audience, options={"require": ["exp", "iat", "iss", "aud", "sub"]})
+            if not token or len(token) > 16_384:
+                return None
+            signing_key = await __import__("asyncio").to_thread(self.client.get_signing_key_from_jwt, token)
+            claims = jwt.decode(token, signing_key.key, algorithms=["RS256"], issuer=self.issuer, audience=self.audience, options={"require": ["exp", "iat", "iss", "aud", "sub"], "verify_signature": True}, leeway=5)
             tenant = claims.get("workspace_id") or claims.get("tenant_id")
-            if not isinstance(tenant, str) or not tenant:
+            if tenant is not None and (not isinstance(tenant, str) or not tenant):
                 return None
             raw_scopes = claims.get("scope", claims.get("scp", []))
-            scopes = raw_scopes.split() if isinstance(raw_scopes, str) else [str(item) for item in raw_scopes]
-            AUTH_CLAIMS.set({"tenant_id": tenant, "subject": claims["sub"], "issuer": claims["iss"], "audience": claims["aud"]})
-            return AccessToken(token=hashlib.sha256(token.encode()).hexdigest(), client_id=str(claims["sub"]), scopes=scopes, expires_at=int(claims["exp"]), resource=tenant)
-        except (jwt.PyJWTError, ValueError, TypeError, KeyError):
+            if isinstance(raw_scopes, str):
+                scopes = raw_scopes.split()
+            elif isinstance(raw_scopes, list) and all(isinstance(item, str) and item for item in raw_scopes):
+                scopes = raw_scopes
+            else:
+                return None
+            _AUTH_VERIFIED = True
+            return NeyvroAccessToken(token=hashlib.sha256(token.encode()).hexdigest(), client_id=str(claims["sub"]), scopes=scopes, expires_at=int(claims["exp"]), resource=self.resource_url, tenant_id=tenant)
+        except (jwt.PyJWTError, ValueError, TypeError, KeyError, OSError):
             return None
 
 
@@ -224,14 +222,43 @@ class RateLimiter:
 BACKEND = BackendClient()
 LIMITER = RateLimiter(int(os.getenv("NEYVRO_MCP_REQUESTS_PER_MINUTE", "60")))
 PUBLIC_LIMITER = RateLimiter(int(os.getenv("NEYVRO_MCP_PUBLIC_REQUESTS_PER_MINUTE", "30")))
+_AUTH_VERIFIED = False
+
+
+def _https_url(value: str | None, name: str) -> str | None:
+    """Validate security-sensitive URLs before they reach the SDK or HTTP client."""
+    if not value:
+        return None
+    parsed = urlparse(value)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError(f"{name} must be an HTTPS URL without embedded credentials")
+    if parsed.fragment:
+        raise ValueError(f"{name} must not contain a URL fragment")
+    return value.rstrip("/")
+
+
+def _oauth_config() -> tuple[str | None, str | None, str | None, str | None, list[str]]:
+    """Return validated OAuth configuration without inventing production defaults."""
+    issuer = os.getenv("NEYVRO_MCP_OAUTH_ISSUER")
+    audience = os.getenv("NEYVRO_MCP_OAUTH_AUDIENCE")
+    jwks = os.getenv("NEYVRO_MCP_OAUTH_JWKS_URL")
+    resource = os.getenv("NEYVRO_MCP_RESOURCE_URL")
+    allowed_hosts = [host.strip() for host in os.getenv("NEYVRO_MCP_ALLOWED_HOSTS", "").split(",") if host.strip()]
+    if not all((issuer, audience, jwks, resource)):
+        return issuer, audience, jwks, resource, allowed_hosts
+    return _https_url(issuer, "NEYVRO_MCP_OAUTH_ISSUER"), audience.strip(), _https_url(jwks, "NEYVRO_MCP_OAUTH_JWKS_URL"), _https_url(resource, "NEYVRO_MCP_RESOURCE_URL"), allowed_hosts
 
 
 def _auth_context(spec: ToolSpec, request: ToolRequest) -> tuple[str | None, dict[str, Any]]:
     token = get_access_token()
-    claims = AUTH_CLAIMS.get()
-    tenant = claims.get("tenant_id")
-    if token is None or not tenant:
+    # The SDK context contains only a token returned by JWTVerifier. Tenant
+    # identity comes from that verified token, never from request data or a
+    # process-global claims object.
+    tenant = getattr(token, "tenant_id", None) if token else None
+    if token is None:
         return None, {"status": "unauthorized", "error": {"code": "missing_or_invalid_oauth", "message": "A valid OAuth bearer token with a tenant claim is required."}}
+    if not tenant:
+        return None, {"status": "unauthorized", "error": {"code": "tenant_context_unavailable", "message": "The verified identity has no trusted workspace claim; backend authorization is not available."}}
     missing = sorted(set(spec.scopes) - set(token.scopes))
     if missing:
         return None, {"status": "insufficient_scope", "missing_scopes": missing, "error": {"code": "missing_scope", "message": "The token does not grant this tool."}}
@@ -350,10 +377,12 @@ def _tool_handler(spec: ToolSpec) -> Callable[..., Any]:
 
 
 def build_server() -> FastMCP:
-    issuer = os.getenv("NEYVRO_MCP_OAUTH_ISSUER")
-    audience = os.getenv("NEYVRO_MCP_OAUTH_AUDIENCE")
-    jwks = os.getenv("NEYVRO_MCP_OAUTH_JWKS_URL")
-    allowed_hosts = [host.strip() for host in os.getenv("NEYVRO_MCP_ALLOWED_HOSTS", "").split(",") if host.strip()]
+    try:
+        issuer, audience, jwks, resource_url, allowed_hosts = _oauth_config()
+    except ValueError as exc:
+        LOGGER.error("invalid OAuth configuration: %s", exc)
+        issuer = audience = jwks = resource_url = None
+        allowed_hosts = []
     allowed_origins = [origin.strip() for origin in os.getenv("NEYVRO_MCP_ALLOWED_ORIGINS", "").split(",") if origin.strip()]
     kwargs: dict[str, Any] = {
         "name": "neyvro-remote",
@@ -364,10 +393,10 @@ def build_server() -> FastMCP:
             allowed_origins=allowed_origins,
         ),
     }
-    if issuer and audience and jwks:
-        verifier = JWTVerifier(issuer, audience, jwks)
+    if issuer and audience and jwks and resource_url:
+        verifier = JWTVerifier(issuer, audience, jwks, resource_url)
         kwargs["token_verifier"] = verifier
-        kwargs["auth"] = AuthSettings(issuer_url=issuer, resource_server_url=os.getenv("NEYVRO_MCP_RESOURCE_URL", "https://localhost/mcp"), required_scopes=[])
+        kwargs["auth"] = AuthSettings(issuer_url=issuer, resource_server_url=resource_url, required_scopes=[])
     server = FastMCP(**kwargs)
     for spec in TOOL_SPECS:
         server.add_tool(_tool_handler(spec), name=spec.name, description=spec.description, structured_output=True, meta={"readiness": spec.readiness, "mode": spec.mode.value, "required_scopes": list(spec.scopes), "approval_required": spec.approval_required, "backend_path": spec.path})
@@ -428,9 +457,32 @@ def _register_public_skill_surfaces(server: FastMCP) -> None:
 
 
 def readiness_report() -> dict[str, Any]:
-    auth_ready = all(os.getenv(name) for name in ("NEYVRO_MCP_OAUTH_ISSUER", "NEYVRO_MCP_OAUTH_AUDIENCE", "NEYVRO_MCP_OAUTH_JWKS_URL"))
-    backend_ready = bool(os.getenv("NEYVRO_MCP_BACKEND_URL") and os.getenv("NEYVRO_MCP_BACKEND_SERVICE_TOKEN"))
-    return {"authentication": "VERIFIED" if auth_ready else "BLOCKED", "backend_service_adapter": "VERIFIED" if backend_ready else "DISABLED", "tools": {spec.name: spec.readiness if backend_ready else "DISABLED" for spec in TOOL_SPECS}, "notes": ["Existing Neyvro backend uses Firebase-to-session-cookie auth; OAuth audience/tenant exchange must be deployed before public exposure.", "Process-local rate limits and cost controls are not sufficient for multi-instance production without a shared store."]}
+    try:
+        issuer, audience, jwks, resource, _ = _oauth_config()
+        oauth_complete = all((issuer, audience, jwks, resource))
+        oauth_error = None
+    except ValueError as exc:
+        oauth_complete = False
+        oauth_error = str(exc)
+    if oauth_error:
+        authentication = "BLOCKED"
+    elif _AUTH_VERIFIED:
+        authentication = "VERIFIED"
+    elif oauth_complete:
+        authentication = "CONFIGURED"
+    else:
+        authentication = "BLOCKED"
+    # A static gateway token plus X-Neyvro-Tenant is not an identity bridge.
+    # Keep the adapter disabled until AWS deploys the delegated assertion
+    # contract documented in BACKEND_AUTH_BRIDGE.md.
+    notes = [
+        "OAuth configuration is not proof of token verification; VERIFIED is set only after a real token passes signature, issuer, audience, expiry, subject, tenant, and scope validation.",
+        "The backend adapter remains disabled until the AWS delegated identity bridge is deployed; an incoming MCP token is never forwarded.",
+        "Process-local rate limits and cost controls are not sufficient for multi-instance production without a shared store.",
+    ]
+    if oauth_error:
+        notes.insert(0, oauth_error)
+    return {"authentication": authentication, "backend_service_adapter": "DISABLED", "tools": {spec.name: "DISABLED" for spec in TOOL_SPECS}, "notes": notes}
 
 
 REMOTE_SERVER = build_server()

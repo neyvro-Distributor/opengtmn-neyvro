@@ -8,6 +8,20 @@ services:
     envVars:
       - key: NEYVRO_MCP_ENABLE_EXECUTION
         value: "false"
+      - key: NEYVRO_MCP_OAUTH_ISSUER
+        sync: false
+      - key: NEYVRO_MCP_OAUTH_AUDIENCE
+        sync: false
+      - key: NEYVRO_MCP_OAUTH_JWKS_URL
+        sync: false
+      - key: NEYVRO_MCP_RESOURCE_URL
+        sync: false
+      - key: NEYVRO_MCP_ALLOWED_HOSTS
+        sync: false
+      - key: NEYVRO_MCP_BACKEND_URL
+        sync: false
+      - key: NEYVRO_MCP_BACKEND_SERVICE_TOKEN
+        sync: false
       - key: NEYVRO_MCP_REQUESTS_PER_MINUTE
         value: "60"
       - key: NEYVRO_MCP_BACKEND_TIMEOUT_SECONDS
