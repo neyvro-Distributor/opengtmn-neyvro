@@ -234,7 +234,9 @@ def _https_url(value: str | None, name: str) -> str | None:
         raise ValueError(f"{name} must be an HTTPS URL without embedded credentials")
     if parsed.fragment:
         raise ValueError(f"{name} must not contain a URL fragment")
-    return value.rstrip("/")
+    # Preserve the exact issuer string. Some providers include a required
+    # trailing slash and JWT issuer comparison is exact.
+    return value
 
 
 def _oauth_config() -> tuple[str | None, str | None, str | None, str | None, list[str]]:
@@ -482,7 +484,7 @@ def readiness_report() -> dict[str, Any]:
     ]
     if oauth_error:
         notes.insert(0, oauth_error)
-    return {"authentication": authentication, "backend_service_adapter": "DISABLED", "tools": {spec.name: "DISABLED" for spec in TOOL_SPECS}, "notes": notes}
+    return {"authentication": authentication, "customer_data_authorization": "BLOCKED", "backend_service_adapter": "DISABLED", "tools": {spec.name: "DISABLED" for spec in TOOL_SPECS}, "notes": notes}
 
 
 REMOTE_SERVER = build_server()

@@ -22,6 +22,11 @@ The provider-assigned HTTPS URL can be used by an MCP client; a custom domain is
 
 The unauthenticated `GET /health` endpoint returns service readiness metadata only; it does not return customer data.
 
+For the repeatable live-token verification procedure, see
+[PRODUCTION_AUTH_VERIFICATION.md](PRODUCTION_AUTH_VERIFICATION.md). It uses a
+hidden or piped token input, checks the MCP 401 challenge, and performs an
+authenticated `initialize` request without enabling the AWS adapter.
+
 ## Security boundary
 
 - Incoming Firebase bearer tokens are verified against the explicitly configured HTTPS issuer/JWKS, RS256 signature, Firebase project audience, expiry, issued-at, and subject. Firebase ID tokens do not inherently carry a trusted Neyvro workspace claim, so private tools remain blocked until the backend identity bridge resolves workspace membership. The inbound token is never forwarded to the backend.
@@ -38,6 +43,7 @@ The unauthenticated `GET /health` endpoint returns service readiness metadata on
 | Official `/mcp` Streamable HTTP transport | VERIFIED | Uvicorn startup, MCP initialize handshake, and `tools/list` smoke test completed locally. |
 | Tool schemas and bounded pagination | VERIFIED | 56 unique tool registrations expose Pydantic input/output schemas; page size is capped at 100. |
 | OAuth JWT verification | CONFIGURED/VERIFIED | Configured environments report `CONFIGURED`; a real valid token is required before the process reports `VERIFIED`. No provider or token exchange is fabricated here. |
+| Private customer-data authorization | BLOCKED | Health exposes this separately from authentication; the AWS delegated identity bridge is not deployed. |
 | Backend service adapter | DISABLED | Static service credentials and a tenant header are intentionally insufficient; AWS must expose the delegated identity bridge in [BACKEND_AUTH_BRIDGE.md](BACKEND_AUTH_BRIDGE.md). |
 | Tenant isolation | PARTIAL | Enforced at the remote boundary and covered by tests; production assurance depends on a backend adapter that cryptographically binds the service identity to the tenant. |
 | Rate limits | PARTIAL | Process-local per-tenant/tool limiter exists; a shared store is required for multi-instance production. |

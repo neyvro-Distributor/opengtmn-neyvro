@@ -1,10 +1,10 @@
 import asyncio
 import time
 
-import pytest
-from mcp.server.auth.provider import AccessToken
 import jwt
+import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
+from mcp.server.auth.provider import AccessToken
 
 from neyvro import remote_mcp
 
@@ -39,6 +39,7 @@ def test_unconfigured_readiness_is_not_verified():
     report = remote_mcp.readiness_report()
 
     assert report["authentication"] == "BLOCKED"
+    assert report["customer_data_authorization"] == "BLOCKED"
     assert report["backend_service_adapter"] == "DISABLED"
     assert set(report["tools"].values()) == {"DISABLED"}
 
@@ -50,6 +51,15 @@ def test_oauth_configuration_is_configured_not_verified(monkeypatch):
     monkeypatch.setenv("NEYVRO_MCP_RESOURCE_URL", "https://mcp.example/mcp")
     monkeypatch.setattr(remote_mcp, "_AUTH_VERIFIED", False)
     assert remote_mcp.readiness_report()["authentication"] == "CONFIGURED"
+
+
+def test_oauth_configuration_preserves_issuer_trailing_slash(monkeypatch):
+    monkeypatch.setenv("NEYVRO_MCP_OAUTH_ISSUER", "https://issuer.example/")
+    monkeypatch.setenv("NEYVRO_MCP_OAUTH_AUDIENCE", "neyvro-mcp")
+    monkeypatch.setenv("NEYVRO_MCP_OAUTH_JWKS_URL", "https://issuer.example/jwks")
+    monkeypatch.setenv("NEYVRO_MCP_RESOURCE_URL", "https://mcp.example/mcp")
+    issuer, _, _, _, _ = remote_mcp._oauth_config()
+    assert issuer == "https://issuer.example/"
 
 
 def test_jwt_verifier_enforces_signature_issuer_audience_and_tenant(monkeypatch):
@@ -65,6 +75,56 @@ def test_jwt_verifier_enforces_signature_issuer_audience_and_tenant(monkeypatch)
 
     bad_audience = jwt.encode({**claims, "aud": "wrong-resource"}, private_key, algorithm="RS256")
     assert asyncio.run(verifier.verify_token(bad_audience)) is None
+
+
+def test_jwt_verifier_rejects_wrong_issuer_expiry_signature_and_malformed_scopes(monkeypatch):
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    other_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    verifier = remote_mcp.JWTVerifier("https://issuer.example/", "neyvro-mcp", "https://issuer.example/jwks", "https://mcp.example/mcp")
+    verifier.client.get_signing_key_from_jwt = lambda _token: type("Key", (), {"key": private_key.public_key()})()
+    base = {"iss": "https://issuer.example/", "aud": "neyvro-mcp", "sub": "user-a", "iat": int(time.time()), "exp": int(time.time()) + 300}
+
+    wrong_issuer = jwt.encode({**base, "iss": "https://other.example"}, private_key, algorithm="RS256")
+    expired = jwt.encode({**base, "exp": int(time.time()) - 60}, private_key, algorithm="RS256")
+    invalid_signature = jwt.encode(base, other_key, algorithm="RS256")
+    malformed_scopes = jwt.encode({**base, "scope": {"not": "a-scope"}}, private_key, algorithm="RS256")
+
+    assert asyncio.run(verifier.verify_token(wrong_issuer)) is None
+    assert asyncio.run(verifier.verify_token(expired)) is None
+    assert asyncio.run(verifier.verify_token(invalid_signature)) is None
+    assert asyncio.run(verifier.verify_token(malformed_scopes)) is None
+
+
+def test_missing_workspace_is_verified_but_not_private_authorization():
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    verifier = remote_mcp.JWTVerifier("https://issuer.example", "neyvro-mcp", "https://issuer.example/jwks", "https://mcp.example/mcp")
+    verifier.client.get_signing_key_from_jwt = lambda _token: type("Key", (), {"key": private_key.public_key()})()
+    token = jwt.encode({"iss": "https://issuer.example", "aud": "neyvro-mcp", "sub": "user-a", "iat": int(time.time()), "exp": int(time.time()) + 300, "scope": "intelligence:read"}, private_key, algorithm="RS256")
+    verified = asyncio.run(verifier.verify_token(token))
+    assert isinstance(verified, remote_mcp.NeyvroAccessToken)
+    assert verified.tenant_id is None
+
+    read_spec = remote_mcp.SPEC_BY_NAME["neyvro_get_company_twin"]
+    remote_mcp_get_access_token = remote_mcp.get_access_token
+    try:
+        remote_mcp.get_access_token = lambda: verified
+        result = asyncio.run(remote_mcp.handle_tool(read_spec, remote_mcp.ToolRequest(company_id="company-a")))
+    finally:
+        remote_mcp.get_access_token = remote_mcp_get_access_token
+    assert result["error"]["code"] == "tenant_context_unavailable"
+
+
+def test_jwks_rotation_uses_the_current_signing_key():
+    first_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    second_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    verifier = remote_mcp.JWTVerifier("https://issuer.example", "neyvro-mcp", "https://issuer.example/jwks", "https://mcp.example/mcp")
+    keys = iter((first_key.public_key(), second_key.public_key()))
+    verifier.client.get_signing_key_from_jwt = lambda _token: type("Key", (), {"key": next(keys)})()
+    claims = {"iss": "https://issuer.example", "aud": "neyvro-mcp", "sub": "user-a", "workspace_id": "tenant-a", "iat": int(time.time()), "exp": int(time.time()) + 300, "scope": "intelligence:read"}
+    first = jwt.encode(claims, first_key, algorithm="RS256")
+    second = jwt.encode(claims, second_key, algorithm="RS256")
+    assert asyncio.run(verifier.verify_token(first)) is not None
+    assert asyncio.run(verifier.verify_token(second)) is not None
 
 
 def test_configured_server_publishes_protected_resource_metadata(monkeypatch):
