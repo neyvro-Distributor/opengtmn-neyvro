@@ -102,3 +102,76 @@ def test_each_of_the_thirty_enabled_tools_passes_its_gateway_boundary(monkeypatc
     assert set(results) == mcp.ENABLED_PRIVATE_TOOLS
     assert all(result["status"] == "available" for result in results.values())
     assert len(calls) == 30
+
+
+def test_firebase_scope_claims_are_ignored_without_an_explicit_test_grant(monkeypatch):
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    verifier = mcp.FirebaseTokenVerifier("neyvro-mcp-test", "https://mcp.example/mcp", admin_verifier=lambda token, check_revoked=True: {"sub": "uid-1", "email_verified": True})
+    verifier.client.get_signing_key_from_jwt = lambda _token: type("Key", (), {"key": key.public_key()})()
+    claims = {"iss": "https://securetoken.google.com/neyvro-mcp-test", "aud": "neyvro-mcp-test", "sub": "uid-1", "iat": int(time.time()), "exp": int(time.time()) + 300, "auth_time": int(time.time()), "email_verified": True, "scope": "mail:read"}
+    token = jwt.encode(claims, key, algorithm="RS256")
+    verified = asyncio.run(verifier.verify_token(token))
+    assert verified is not None
+    assert verified.scopes == []
+    assert verified.grant_source == "none"
+    monkeypatch.setattr(mcp, "get_access_token", lambda: verified)
+    result = asyncio.run(mcp.handle_tool(mcp.SPEC_BY_NAME["neyvro_get_connections"], mcp.ToolRequest()))
+    assert result["status"] == "insufficient_scope"
+    assert result["missing_scopes"] == ["mail:read"]
+
+
+def test_firebase_uses_only_the_exact_server_managed_test_grant(monkeypatch):
+    monkeypatch.setenv("NEYVRO_MCP_FIREBASE_TEST_MODE", "true")
+    expires_at = int(time.time()) + 1800
+    monkeypatch.setenv("NEYVRO_MCP_FIREBASE_TEST_GRANTS_JSON", f'{{"uid-1":{{"scopes":["mail:read"],"expires_at":{expires_at}}}}}')
+    grants = mcp._load_firebase_test_grants("neyvro-mcp-test")
+    assert grants["uid-1"].effective() == ("mail:read",)
+    assert mcp._load_firebase_test_grants("neyvro-production") == {}
+
+
+def test_external_oauth_requires_issuer_qualified_identity_binding():
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    issuer = "https://issuer.example"
+    verifier = mcp.JWTVerifier(issuer, "https://mcp.example", "https://issuer.example/jwks", "https://mcp.example/mcp")
+    verifier.client.get_signing_key_from_jwt = lambda _token: type("Key", (), {"key": key.public_key()})()
+    claims = {"iss": issuer, "aud": "https://mcp.example", "sub": "oauth-sub", "iat": int(time.time()), "exp": int(time.time()) + 300, "scope": "intelligence:read"}
+    token = jwt.encode(claims, key, algorithm="RS256")
+    unlinked = asyncio.run(verifier.verify_token(token))
+    assert unlinked is not None and unlinked.firebase_uid == ""
+    verifier.identity_bindings[f"{issuer}\x00oauth-sub"] = mcp.IdentityBinding(issuer, "oauth-sub", "firebase-uid")
+    linked = asyncio.run(verifier.verify_token(token))
+    assert linked is not None and linked.firebase_uid == "firebase-uid"
+
+
+def test_identity_and_mail_scopes_cannot_cross_authorize():
+    identity = mcp.NeyvroAccessToken(token="x", client_id="u", firebase_uid="f", scopes=["intelligence:read"], auth_mode="oauth")
+    intelligence = mcp.SPEC_BY_NAME["neyvro_search_companies"]
+    mail = mcp.SPEC_BY_NAME["neyvro_get_connections"]
+    assert mcp._evaluate_scope_grant(identity, intelligence) is None
+    assert mcp._evaluate_scope_grant(identity, mail)["missing_scopes"] == ["mail:read"]
+    identity.scopes = ["mail:read"]
+    assert mcp._evaluate_scope_grant(identity, intelligence)["missing_scopes"] == ["intelligence:read"]
+
+
+def test_firebase_and_external_oauth_configuration_conflict_fails_closed(monkeypatch):
+    monkeypatch.setenv("NEYVRO_MCP_FIREBASE_PROJECT_ID", "neyvro-mcp-test")
+    monkeypatch.setenv("NEYVRO_MCP_FIREBASE_SERVICE_ACCOUNT_JSON", "{}")
+    monkeypatch.setenv("NEYVRO_MCP_RESOURCE_URL", "https://mcp.example/mcp")
+    monkeypatch.setenv("NEYVRO_MCP_OAUTH_ISSUER", "https://issuer.example")
+    monkeypatch.setenv("NEYVRO_MCP_OAUTH_AUDIENCE", "mcp-resource")
+    monkeypatch.setenv("NEYVRO_MCP_OAUTH_JWKS_URL", "https://issuer.example/jwks")
+    mcp.build_server()
+    assert mcp.readiness_report()["authentication"] == "BLOCKED"
+    assert "cannot be configured together" in mcp.readiness_report()["notes"][0]
+
+
+def test_token_b_cannot_be_signed_for_an_ungranted_scope():
+    key = ec.generate_private_key(ec.SECP256R1())
+    pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
+    backend = mcp.BackendClient()
+    backend.enabled = True
+    backend.base_url = "http://127.0.0.1:9000"
+    backend.gateway_private_key = pem
+    identity = mcp.NeyvroAccessToken(token="inbound", client_id="u", firebase_uid="f", scopes=["intelligence:read"], email_verified=True)
+    with pytest.raises(mcp.BridgeConfigurationError):
+        backend._assertion(identity, mcp.SPEC_BY_NAME["neyvro_get_connections"], mcp.ToolRequest())

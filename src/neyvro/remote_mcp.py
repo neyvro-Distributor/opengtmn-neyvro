@@ -26,7 +26,7 @@ from urllib.parse import urlparse
 import httpx
 import jwt
 from mcp.server.auth.middleware.auth_context import get_access_token
-from mcp.server.auth.provider import AccessToken, TokenVerifier
+from mcp.server.auth.provider import AccessToken
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
@@ -49,6 +49,37 @@ BRIDGE_DEFAULT_ISSUER = "neyvro-mcp-gateway"
 BRIDGE_DEFAULT_AUDIENCE = "neyvro-mcp-exchange"
 BRIDGE_DEFAULT_KID = "gw-1"
 BRIDGE_LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+SUPPORTED_MCP_SCOPES = frozenset({"intelligence:read", "mail:read"})
+RESERVED_MCP_SCOPES = frozenset({"proposals:write", "research:run"})
+MAX_GRANT_SECONDS = 3600
+
+
+@dataclass(frozen=True)
+class ScopeGrant:
+    scopes: tuple[str, ...]
+    expires_at: int | None = None
+    revoked: bool = False
+
+    def effective(self, now: int | None = None) -> tuple[str, ...]:
+        current = int(time.time()) if now is None else now
+        if self.revoked or (self.expires_at is not None and self.expires_at <= current):
+            return ()
+        return tuple(scope for scope in self.scopes if scope in SUPPORTED_MCP_SCOPES)
+
+
+@dataclass(frozen=True)
+class IdentityBinding:
+    issuer: str
+    subject: str
+    firebase_uid: str
+    expires_at: int | None = None
+    revoked: bool = False
+
+    def active_uid(self, now: int | None = None) -> str | None:
+        current = int(time.time()) if now is None else now
+        if self.revoked or (self.expires_at is not None and self.expires_at <= current):
+            return None
+        return self.firebase_uid
 
 
 class ToolMode(StrEnum):
@@ -62,12 +93,14 @@ class ToolMode(StrEnum):
 
 
 class NeyvroAccessToken(AccessToken):
-    """Verified Firebase identity plus untrusted-until-AWS workspace grants."""
+    """Verified identity plus authorization granted by a trusted authority."""
 
     tenant_id: str | None = None
     firebase_uid: str = ""
     email_verified: bool = False
     client_name: str | None = None
+    auth_mode: str = "unknown"
+    grant_source: str = "none"
 
 
 class ToolRequest(BaseModel):
@@ -398,7 +431,7 @@ class BackendClient:
     def _assertion(self, identity: NeyvroAccessToken, spec: ToolSpec, request: ToolRequest) -> str:
         self._validate_configuration()
         adapter = ADAPTER_REGISTRY.get(spec.name)
-        if adapter is None or spec.operation != adapter.operation:
+        if adapter is None or spec.operation != adapter.operation or adapter.scope not in set(identity.scopes) or not identity.firebase_uid:
             raise BridgeConfigurationError("operation is not enabled")
         now = int(time.time())
         claims: dict[str, Any] = {
@@ -523,9 +556,14 @@ class BackendClient:
 
 
 class JWTVerifier:
-    def __init__(self, issuer: str, audience: str, jwks_url: str, resource_url: str) -> None:
+    def __init__(self, issuer: str, audience: str, jwks_url: str, resource_url: str, *, identity_bindings: dict[str, IdentityBinding] | None = None) -> None:
         self.issuer, self.audience, self.jwks_url, self.resource_url = issuer, audience, jwks_url, resource_url
+        self.identity_bindings = identity_bindings or {}
         self.client = jwt.PyJWKClient(jwks_url, cache_jwk_set=True, lifespan=300)
+
+    def _firebase_uid_for_subject(self, subject: str) -> str | None:
+        binding = self.identity_bindings.get(f"{self.issuer}\x00{subject}")
+        return binding.active_uid() if binding else None
 
     async def verify_token(self, token: str) -> AccessToken | None:
         global _AUTH_VERIFIED
@@ -545,23 +583,60 @@ class JWTVerifier:
                 scopes = raw_scopes.split()
             elif isinstance(raw_scopes, list) and all(isinstance(item, str) and item for item in raw_scopes):
                 scopes = raw_scopes
+            elif raw_scopes in (None, []):
+                scopes = []
             else:
                 return None
-            _AUTH_VERIFIED = True
             email_verified = claims.get("email_verified", False)
             if not isinstance(email_verified, bool):
                 return None
-            return NeyvroAccessToken(token=hashlib.sha256(token.encode()).hexdigest(), client_id=subject, scopes=scopes, expires_at=int(claims["exp"]), resource=self.resource_url, tenant_id=tenant, firebase_uid=subject, email_verified=email_verified, client_name=claims.get("client") if isinstance(claims.get("client"), str) else None)
+            firebase_uid = self._firebase_uid_for_subject(subject)
+            _AUTH_VERIFIED = True
+            return NeyvroAccessToken(token=hashlib.sha256(token.encode()).hexdigest(), client_id=subject, scopes=list(dict.fromkeys(scopes)), expires_at=int(claims["exp"]), resource=self.resource_url, tenant_id=tenant, firebase_uid=firebase_uid or "", email_verified=email_verified, client_name=claims.get("client") if isinstance(claims.get("client"), str) else None, auth_mode="oauth", grant_source="oauth_scope_claim")
         except (jwt.PyJWTError, ValueError, TypeError, KeyError, OSError):
             return None
+
+
+def _load_firebase_test_grants(project_id: str) -> dict[str, ScopeGrant]:
+    """Load narrowly scoped grants for an explicitly isolated Firebase test project."""
+    if os.getenv("NEYVRO_MCP_FIREBASE_TEST_MODE", "false").lower() != "true":
+        return {}
+    if "test" not in project_id.casefold() or not os.getenv("NEYVRO_MCP_FIREBASE_TEST_GRANTS_JSON"):
+        return {}
+    try:
+        raw = json.loads(os.environ["NEYVRO_MCP_FIREBASE_TEST_GRANTS_JSON"])
+        if not isinstance(raw, dict):
+            return {}
+        grants: dict[str, ScopeGrant] = {}
+        now = int(time.time())
+        for uid, value in raw.items():
+            if not isinstance(uid, str) or not re.fullmatch(r"[\x21-\x7e]{1,128}", uid):
+                continue
+            if isinstance(value, list):
+                scopes, expires_at, revoked = value, now + MAX_GRANT_SECONDS, False
+            elif isinstance(value, dict):
+                scopes, expires_at, revoked = value.get("scopes"), value.get("expires_at"), value.get("revoked", False)
+            else:
+                continue
+            if not isinstance(scopes, list) or not all(isinstance(scope, str) and scope in SUPPORTED_MCP_SCOPES for scope in scopes):
+                continue
+            if expires_at is not None and (isinstance(expires_at, bool) or not isinstance(expires_at, int) or expires_at > now + MAX_GRANT_SECONDS):
+                continue
+            if not isinstance(revoked, bool):
+                continue
+            grants[uid] = ScopeGrant(tuple(dict.fromkeys(scopes)), expires_at, revoked)
+        return grants
+    except (json.JSONDecodeError, TypeError, ValueError, KeyError):
+        return {}
 
 
 class FirebaseTokenVerifier(JWTVerifier):
     """RS256 Firebase ID-token verifier with optional Admin revocation check."""
 
-    def __init__(self, project_id: str, resource_url: str, *, admin_verifier: Callable[..., dict[str, Any]] | None = None) -> None:
+    def __init__(self, project_id: str, resource_url: str, *, admin_verifier: Callable[..., dict[str, Any]] | None = None, test_grants: dict[str, ScopeGrant] | None = None) -> None:
         self.project_id = project_id
         self.admin_verifier = admin_verifier
+        self.test_grants = test_grants or {}
         super().__init__(
             f"https://securetoken.google.com/{project_id}",
             project_id,
@@ -575,6 +650,8 @@ class FirebaseTokenVerifier(JWTVerifier):
         verified = await super().verify_token(token)
         if verified is None:
             return None
+        verified.firebase_uid = verified.client_id
+        verified.auth_mode = "firebase"
         try:
             # The signature/issuer/audience checks have already succeeded in
             # the parent verifier; this only enforces Firebase's required
@@ -585,18 +662,24 @@ class FirebaseTokenVerifier(JWTVerifier):
                 return None
         except (jwt.PyJWTError, TypeError, ValueError):
             return None
-        if self.admin_verifier is not None:
-            try:
-                claims = await __import__("asyncio").to_thread(self.admin_verifier, token, check_revoked=True)
-                if not isinstance(claims, dict) or claims.get("sub") != verified.firebase_uid:
-                    return None
-                # Admin verification is the authority for revocation/disabled state;
-                # crypto and Firebase issuer/audience checks were already enforced.
-                verified.email_verified = claims.get("email_verified") is True
-                if not verified.email_verified:
-                    return None
-            except Exception:  # fail closed on Firebase outage or revoked account
+        if self.admin_verifier is None:
+            return None
+        try:
+            claims = await __import__("asyncio").to_thread(self.admin_verifier, token, check_revoked=True)
+            if not isinstance(claims, dict) or claims.get("sub") != verified.client_id:
                 return None
+            # Admin verification is the authority for revocation/disabled state;
+            # crypto and Firebase issuer/audience checks were already enforced.
+            verified.email_verified = claims.get("email_verified") is True
+            if not verified.email_verified:
+                return None
+        except Exception:  # fail closed on Firebase outage or revoked account
+            return None
+        # Firebase claims named scope/scp are deliberately ignored. Only the
+        # explicit server-managed test grant map can authorize private tools.
+        grant = self.test_grants.get(verified.firebase_uid)
+        verified.scopes = list(grant.effective()) if grant else []
+        verified.grant_source = "firebase_test_grant" if grant and verified.scopes else "none"
         _AUTH_VERIFIED = True
         return verified
 
@@ -622,6 +705,7 @@ BACKEND = BackendClient()
 LIMITER = RateLimiter(int(os.getenv("NEYVRO_MCP_REQUESTS_PER_MINUTE", "60")))
 PUBLIC_LIMITER = RateLimiter(int(os.getenv("NEYVRO_MCP_PUBLIC_REQUESTS_PER_MINUTE", "30")))
 _AUTH_VERIFIED = False
+_AUTH_CONFIG_ERROR: str | None = None
 
 
 def _https_url(value: str | None, name: str) -> str | None:
@@ -678,7 +762,46 @@ def _firebase_config() -> tuple[str | None, str | None, list[str]]:
     return project, resource, allowed_hosts
 
 
+def _load_identity_bindings(issuer: str) -> dict[str, IdentityBinding]:
+    """Load explicit issuer+subject bindings; email is never used for linking."""
+    raw_text = os.getenv("NEYVRO_MCP_OAUTH_IDENTITY_BINDINGS_JSON", "")
+    if not raw_text:
+        return {}
+    try:
+        raw = json.loads(raw_text)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    records = raw if isinstance(raw, list) else [dict(value, subject=key.split("\x00", 1)[-1], issuer=key.split("\x00", 1)[0]) for key, value in raw.items() if isinstance(value, dict)] if isinstance(raw, dict) else []
+    bindings: dict[str, IdentityBinding] = {}
+    for item in records:
+        if not isinstance(item, dict) or item.get("issuer") != issuer:
+            continue
+        subject, firebase_uid = item.get("subject"), item.get("firebase_uid")
+        expires_at, revoked = item.get("expires_at"), item.get("revoked", False)
+        if not isinstance(subject, str) or not re.fullmatch(r"[\x21-\x7e]{1,128}", subject):
+            continue
+        if not isinstance(firebase_uid, str) or not re.fullmatch(r"[\x21-\x7e]{1,128}", firebase_uid):
+            continue
+        if expires_at is not None and (isinstance(expires_at, bool) or not isinstance(expires_at, int)):
+            continue
+        if not isinstance(revoked, bool):
+            continue
+        binding = IdentityBinding(issuer, subject, firebase_uid, expires_at, revoked)
+        bindings[f"{issuer}\x00{subject}"] = binding
+    return bindings
+
+
 ENABLED_PRIVATE_TOOLS = frozenset(ADAPTER_REGISTRY)
+
+
+def _evaluate_scope_grant(token: NeyvroAccessToken, spec: ToolSpec) -> dict[str, Any] | None:
+    """Authorize only scopes already granted by the verified trust mode."""
+    required = set(spec.scopes)
+    granted = set(token.scopes) & SUPPORTED_MCP_SCOPES
+    missing = sorted(required - granted)
+    if missing:
+        return {"status": "insufficient_scope", "missing_scopes": missing, "error": {"code": "missing_scope", "message": "The token does not grant this tool."}}
+    return None
 
 
 def _auth_context(spec: ToolSpec, request: ToolRequest) -> tuple[NeyvroAccessToken | None, dict[str, Any]]:
@@ -687,11 +810,13 @@ def _auth_context(spec: ToolSpec, request: ToolRequest) -> tuple[NeyvroAccessTok
     # membership, role, operation and permission during this request's exchange.
     if not isinstance(token, NeyvroAccessToken):
         return None, {"status": "unauthorized", "error": {"code": "missing_or_invalid_identity", "message": "A verified Firebase identity is required."}}
+    if token.auth_mode == "oauth" and not token.firebase_uid:
+        return None, {"status": "unauthorized", "error": {"code": "identity_binding_required", "message": "This OAuth identity is not linked to a NEYVRO account."}}
     if spec.name not in ENABLED_PRIVATE_TOOLS:
         return None, {"status": "disabled", "error": {"code": "operation_not_available", "message": "This Neyvro tool is not enabled."}, "readiness": "DISABLED"}
-    missing = sorted(set(spec.scopes) - set(token.scopes))
-    if missing:
-        return None, {"status": "insufficient_scope", "missing_scopes": missing, "error": {"code": "missing_scope", "message": "The token does not grant this tool."}}
+    scope_failure = _evaluate_scope_grant(token, spec)
+    if scope_failure:
+        return None, scope_failure
     limiter_key = token.firebase_uid or token.client_id
     if not LIMITER.allow(limiter_key, spec.name):
         return None, {"status": "rate_limited", "error": {"code": "rate_limit_exceeded", "message": "Retry after the rate-limit window."}}
@@ -855,6 +980,8 @@ def _tool_handler(spec: ToolSpec) -> Callable[..., Any]:
 
 
 def build_server() -> FastMCP:
+    global _AUTH_CONFIG_ERROR
+    _AUTH_CONFIG_ERROR = None
     firebase_project, firebase_resource, firebase_hosts = _firebase_config()
     try:
         issuer, audience, jwks, resource_url, allowed_hosts = _oauth_config()
@@ -862,7 +989,12 @@ def build_server() -> FastMCP:
         LOGGER.error("invalid OAuth configuration: %s", exc)
         issuer = audience = jwks = resource_url = None
         allowed_hosts = []
-    if firebase_project and firebase_resource:
+    external_oauth_configured = bool(issuer and audience and jwks and resource_url)
+    if firebase_project and firebase_resource and external_oauth_configured:
+        _AUTH_CONFIG_ERROR = "Firebase and external OAuth trust modes cannot be configured together"
+        issuer = audience = jwks = resource_url = None
+        verifier = None
+    elif firebase_project and firebase_resource:
         # The Admin SDK is mandatory for the Firebase compatibility mode: a
         # cryptographically valid but revoked/disabled ID token is not enough.
         admin_verifier = _firebase_admin_verifier()
@@ -874,12 +1006,12 @@ def build_server() -> FastMCP:
                 firebase_resource,
             )
             allowed_hosts = firebase_hosts
-            verifier: TokenVerifier | None = FirebaseTokenVerifier(firebase_project, firebase_resource, admin_verifier=admin_verifier)
+            verifier = FirebaseTokenVerifier(firebase_project, firebase_resource, admin_verifier=admin_verifier, test_grants=_load_firebase_test_grants(firebase_project))
         else:
             issuer = audience = jwks = resource_url = None
             verifier = None
     elif issuer and audience and jwks and resource_url:
-        verifier = JWTVerifier(issuer, audience, jwks, resource_url)
+        verifier = JWTVerifier(issuer, audience, jwks, resource_url, identity_bindings=_load_identity_bindings(issuer))
     else:
         verifier = None
     allowed_origins = [origin.strip() for origin in os.getenv("NEYVRO_MCP_ALLOWED_ORIGINS", "").split(",") if origin.strip()]
@@ -967,7 +1099,9 @@ def readiness_report() -> dict[str, Any]:
         oauth_error = str(exc)
     firebase_project = bool(os.getenv("NEYVRO_MCP_FIREBASE_PROJECT_ID"))
     firebase_credentials = bool(os.getenv("NEYVRO_MCP_FIREBASE_SERVICE_ACCOUNT_JSON"))
-    if _AUTH_VERIFIED:
+    if _AUTH_CONFIG_ERROR:
+        authentication = "BLOCKED"
+    elif _AUTH_VERIFIED:
         authentication = "VERIFIED"
     elif firebase_project and firebase_credentials:
         authentication = "CONFIGURED"
@@ -989,8 +1123,10 @@ def readiness_report() -> dict[str, Any]:
     ]
     if oauth_error:
         notes.insert(0, oauth_error)
+    if _AUTH_CONFIG_ERROR:
+        notes.insert(0, _AUTH_CONFIG_ERROR)
     return {
-        "authentication_configuration": "CONFIGURED" if (firebase_project and firebase_credentials) or oauth_complete else "BLOCKED",
+        "authentication_configuration": "BLOCKED" if _AUTH_CONFIG_ERROR else ("CONFIGURED" if (firebase_project and firebase_credentials) or oauth_complete else "BLOCKED"),
         "verified_identity": authentication,
         "workspace_authorization": workspace_authorization,
         "aws_adapter_readiness": adapter,

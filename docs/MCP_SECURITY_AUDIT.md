@@ -8,6 +8,11 @@
   checks; Firebase mode requires `auth_time` and resets readiness on failed
   verification. Admin revocation remains fail-closed when configured.
 - Token A is never sent to AWS; Token C is opaque and never returned or logged.
+- Firebase `scope`/`scp` claims are not authorization grants; only explicit
+  isolated test grants can authorize Firebase compatibility users.
+- External OAuth subjects require issuer-qualified server-side identity
+  bindings before they can become AWS Firebase UIDs.
+- Firebase and external OAuth trust modes fail closed when both are configured.
 - Backend URL, method and operation are allowlisted; redirects are disabled;
   non-HTTPS non-loopback API hosts are rejected.
 - UUIDs, pagination, filters, response size and contract envelope are bounded.
