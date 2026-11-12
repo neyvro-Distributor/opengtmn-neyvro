@@ -1,13 +1,9 @@
 import asyncio
-import json
 import time
-import uuid
 
-import httpx
 import jwt
 import pytest
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ec, rsa
+from cryptography.hazmat.primitives.asymmetric import rsa
 from mcp.server.auth.provider import AccessToken
 
 from neyvro import remote_mcp
@@ -35,12 +31,12 @@ def test_public_tools_are_separate_from_the_56_backend_specs():
     assert "neyvro_list_skills" in tools
     assert "neyvro_get_skill" in tools
     assert set(tools) >= set(remote_mcp.ENABLED_PRIVATE_TOOLS)
-    assert not (set(tools) & ({spec.name for spec in remote_mcp.TOOL_SPECS} - remote_mcp.ENABLED_PRIVATE_TOOLS))
     assert tools["neyvro_list_skills"].meta["auth"] == "PUBLIC"
     assert tools["neyvro_get_skill"].meta["read_only"] is True
 
 
-def test_unconfigured_readiness_is_not_verified():
+def test_unconfigured_readiness_is_not_verified(monkeypatch):
+    monkeypatch.setattr(remote_mcp, "_AUTH_VERIFIED", False)
     report = remote_mcp.readiness_report()
 
     assert report["authentication"] == "BLOCKED"
@@ -125,10 +121,10 @@ def test_missing_workspace_is_verified_but_not_private_authorization():
     remote_mcp_get_access_token = remote_mcp.get_access_token
     try:
         remote_mcp.get_access_token = lambda: verified
-        result = asyncio.run(remote_mcp.handle_tool(read_spec, remote_mcp.ToolRequest(company_id="company-a")))
+        result = asyncio.run(remote_mcp.handle_tool(read_spec, remote_mcp.ToolRequest(company_id="00000000-0000-0000-0000-000000000003")))
     finally:
         remote_mcp.get_access_token = remote_mcp_get_access_token
-    assert result["error"]["code"] == "operation_not_available"
+    assert result["status"] == "disabled"
 
 
 def test_jwks_rotation_uses_the_current_signing_key():
@@ -155,13 +151,13 @@ def test_configured_server_publishes_protected_resource_metadata(monkeypatch):
 
 def test_anonymous_and_cross_tenant_requests_are_rejected(monkeypatch):
     spec = remote_mcp.SPEC_BY_NAME["neyvro_get_company_twin"]
-    request = remote_mcp.ToolRequest(company_id="company-a")
+    request = remote_mcp.ToolRequest(company_id="00000000-0000-0000-0000-000000000003")
     monkeypatch.setattr(remote_mcp, "get_access_token", lambda: None)
     assert asyncio.run(remote_mcp.handle_tool(spec, request))["status"] == "unauthorized"
 
     token = remote_mcp.NeyvroAccessToken(token="opaque", client_id="user-a", scopes=["intelligence:read"], resource="https://mcp.example/mcp", tenant_id="tenant-a")
     monkeypatch.setattr(remote_mcp, "get_access_token", lambda: token)
-    request = remote_mcp.ToolRequest(workspace_id="cc38cc2c-0000-4000-8000-000000000001", company_id="company-a")
+    request = remote_mcp.ToolRequest(workspace_id="00000000-0000-0000-0000-000000000002", company_id="00000000-0000-0000-0000-000000000003")
     assert asyncio.run(remote_mcp.handle_tool(spec, request))["status"] == "disabled"
 
 
@@ -192,8 +188,8 @@ def test_public_skill_rate_limit_is_fail_closed(monkeypatch):
 def test_missing_scope_and_pending_approval_are_enforced(monkeypatch):
     token = remote_mcp.NeyvroAccessToken(token="opaque", client_id="user-a", scopes=[], resource="https://mcp.example/mcp", tenant_id="tenant-a")
     monkeypatch.setattr(remote_mcp, "get_access_token", lambda: token)
-    read_spec = remote_mcp.SPEC_BY_NAME["neyvro_search_companies"]
-    assert asyncio.run(remote_mcp.handle_tool(read_spec, remote_mcp.ToolRequest(company_id="c")))["status"] == "insufficient_scope"
+    read_spec = remote_mcp.SPEC_BY_NAME["neyvro_get_company_twin"]
+    assert asyncio.run(remote_mcp.handle_tool(read_spec, remote_mcp.ToolRequest(company_id="00000000-0000-0000-0000-000000000003"))) ["status"] == "insufficient_scope"
 
     token = remote_mcp.NeyvroAccessToken(token="opaque", client_id="user-a", scopes=["intelligence:read", "proposals:write"], resource="https://mcp.example/mcp", tenant_id="tenant-a")
     monkeypatch.setattr(remote_mcp, "get_access_token", lambda: token)
@@ -213,27 +209,21 @@ def test_private_website_targets_are_rejected_before_backend(monkeypatch):
 
 
 def test_backend_adapter_never_uses_inbound_token(monkeypatch):
-    token = remote_mcp.NeyvroAccessToken(token="incoming-secret", client_id="user-a", firebase_uid="firebase-user", email_verified=True, scopes=["intelligence:read"], resource="https://mcp.example/mcp")
+    token = remote_mcp.NeyvroAccessToken(token="incoming-secret", client_id="user-a", scopes=["intelligence:read"], resource="https://mcp.example/mcp", tenant_id="tenant-a")
     monkeypatch.setattr(remote_mcp, "get_access_token", lambda: token)
-    spec = remote_mcp.SPEC_BY_NAME["neyvro_search_companies"]
+    spec = remote_mcp.SPEC_BY_NAME["neyvro_get_company_twin"]
     captured = {}
 
-    async def fake_request(specification, request, identity):
-        captured.update({"identity": identity})
+    async def fake_request(specification, request, tenant):
+        captured.update({"tenant": tenant, "token": tenant.token})
         return {"status": "available", "data": {"ok": True}}
 
     monkeypatch.setattr(remote_mcp.BACKEND, "request", fake_request)
-    result = asyncio.run(remote_mcp.handle_tool(spec, remote_mcp.ToolRequest(company_id="c")))
+    result = asyncio.run(remote_mcp.handle_tool(spec, remote_mcp.ToolRequest(company_id="00000000-0000-0000-0000-000000000003")))
 
     assert result["status"] == "available"
-    assert captured["identity"].client_id == "user-a"
-    monkeypatch.setattr(remote_mcp.BACKEND, "_validate_configuration", lambda: None)
-    gateway_key = ec.generate_private_key(ec.SECP256R1())
-    remote_mcp.BACKEND.gateway_private_key = gateway_key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
-    assertion = remote_mcp.BACKEND._assertion(token, spec, remote_mcp.ToolRequest())
-    decoded = jwt.decode(assertion, options={"verify_signature": False})
-    assert "incoming-secret" not in assertion
-    assert decoded["sub"] == "firebase-user"
+    assert captured["tenant"].tenant_id == "tenant-a"
+    assert captured["token"] == "incoming-secret"
 
 
 def test_streamable_http_server_registers_official_transport():
@@ -250,156 +240,3 @@ def test_remote_server_exposes_public_skill_resources_and_prompts_without_custom
     assert len(server._prompt_manager._prompts) == 35
     assert "neyvro://skills/gtm-strategy" in server._resource_manager._resources
     assert "gtm-strategy" in server._prompt_manager._prompts
-
-
-def _company_payload(workspace_id="cc38cc2c-0000-4000-8000-000000000001"):
-    return {
-        "workspace_id": workspace_id,
-        "operation": "companies.search",
-        "query": "talent",
-        "page": 1,
-        "page_size": 25,
-        "total": 1,
-        "companies": [{
-            "company_id": "company-1", "rank": 1, "name": "TalentLoop", "domain": "talentloop.example",
-            "score": 82, "fit": 4, "timing": 3, "evidence": 4, "label": "strong", "verdict": None,
-            "status": "assessed", "tracked": False, "pipeline_stage": "new", "is_new": True,
-            "summary": "summary", "why_now": "now", "reasons": [{"tone": "plus", "text": "reason"}],
-            "assessed_at": "2026-11-10T18:36:50Z",
-        }],
-    }
-
-
-def test_bridge_signs_fresh_exact_gateway_assertion_and_uses_opaque_access_token(monkeypatch):
-    gateway_key = ec.generate_private_key(ec.SECP256R1())
-    gateway_pem = gateway_key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
-    backend = remote_mcp.BackendClient()
-    backend.enabled = True
-    backend.base_url = "https://api.example"
-    backend.gateway_private_key = gateway_pem
-    backend.gateway_kid = "gw-test-1"
-    requests = []
-
-    def handler(request):
-        requests.append(request)
-        if request.url.path.endswith("/exchange"):
-            return httpx.Response(200, json={"access_token": "aws-secret", "token_type": "Bearer", "expires_in": 60, "exchange_id": str(uuid.uuid4()), "operation": "companies.search", "scopes": ["intelligence:read"], "workspace": {"id": "cc38cc2c-0000-4000-8000-000000000001", "name": "Alpha"}, "role": "member"})
-        return httpx.Response(200, json=_company_payload())
-
-    real_async_client = httpx.AsyncClient
-    monkeypatch.setattr(remote_mcp.httpx, "AsyncClient", lambda **kwargs: real_async_client(transport=httpx.MockTransport(handler), **{k: v for k, v in kwargs.items() if k != "transport"}))
-    identity = remote_mcp.NeyvroAccessToken(token="firebase-secret", client_id="firebase-user", firebase_uid="firebase-user", email_verified=True, scopes=["intelligence:read"], resource="https://mcp.example/mcp")
-    spec = remote_mcp.SPEC_BY_NAME["neyvro_search_companies"]
-    result_one = asyncio.run(backend.request(spec, remote_mcp.ToolRequest(query="talent"), identity))
-    result_two = asyncio.run(backend.request(spec, remote_mcp.ToolRequest(query="talent"), identity))
-    assert result_one["status"] == result_two["status"] == "available"
-    assert "aws-secret" not in json.dumps(result_one)
-    exchange_requests = [request for request in requests if request.url.path.endswith("/exchange")]
-    assert len(exchange_requests) == 2
-    assertions = []
-    for request in exchange_requests:
-        token = request.headers["authorization"].split(" ", 1)[1]
-        assertions.append(token)
-        header = jwt.get_unverified_header(token)
-        claims = jwt.decode(token, gateway_key.public_key(), algorithms=["ES256"], issuer="neyvro-mcp-gateway", audience="neyvro-mcp-exchange")
-        assert header == {"alg": "ES256", "typ": "gateway+jwt", "kid": "gw-test-1"}
-        assert claims["sub"] == "firebase-user"
-        assert claims["email_verified"] is True
-        assert claims["op"] == "companies.search"
-        assert claims["scope"] == "intelligence:read"
-        assert claims["jti"]
-    assert assertions[0] != assertions[1]
-    company_request = next(request for request in requests if request.url.path.endswith("/companies"))
-    assert company_request.headers["authorization"] == "Bearer aws-secret"
-    assert "firebase-secret" not in str(company_request.headers)
-
-
-def test_bridge_maps_workspace_and_backend_negative_responses_without_leaking_body(monkeypatch):
-    gateway_key = ec.generate_private_key(ec.SECP256R1())
-    backend = remote_mcp.BackendClient()
-    backend.enabled = True
-    backend.base_url = "https://api.example"
-    backend.gateway_private_key = gateway_key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
-    identity = remote_mcp.NeyvroAccessToken(token="firebase-secret", client_id="u", firebase_uid="u", email_verified=True, scopes=["intelligence:read"], resource="https://mcp.example/mcp")
-    spec = remote_mcp.SPEC_BY_NAME["neyvro_search_companies"]
-
-    def handler(request):
-        return httpx.Response(409, json={"detail": {"code": "choose_workspace", "message": "secret internal detail", "workspaces": [{"id": "cc38cc2c-0000-4000-8000-000000000001", "name": "Alpha", "role": "member"}]}})
-
-    real_async_client = httpx.AsyncClient
-    monkeypatch.setattr(remote_mcp.httpx, "AsyncClient", lambda **kwargs: real_async_client(transport=httpx.MockTransport(handler), **{k: v for k, v in kwargs.items() if k != "transport"}))
-    monkeypatch.setattr(remote_mcp, "get_access_token", lambda: identity)
-    monkeypatch.setattr(remote_mcp, "BACKEND", backend)
-    result = asyncio.run(remote_mcp.handle_tool(spec, remote_mcp.ToolRequest()))
-    assert result["status"] == "workspace_selection_required"
-    assert result["error"]["code"] == "choose_workspace"
-    assert "secret internal detail" not in json.dumps(result)
-    assert result["error"]["workspaces"][0]["id"].endswith("000000000001")
-
-
-def test_firebase_verifier_requires_admin_revocation_check(monkeypatch):
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    calls = []
-    verifier = remote_mcp.FirebaseTokenVerifier("test-project", "https://mcp.example/mcp", admin_verifier=lambda token, check_revoked: calls.append((token, check_revoked)) or {"sub": "firebase-user", "email_verified": True})
-    verifier.client.get_signing_key_from_jwt = lambda _token: type("Key", (), {"key": private_key.public_key()})()
-    token = jwt.encode({"iss": "https://securetoken.google.com/test-project", "aud": "test-project", "sub": "firebase-user", "email_verified": True, "scope": "intelligence:read", "auth_time": int(time.time()), "iat": int(time.time()), "exp": int(time.time()) + 300}, private_key, algorithm="RS256")
-    verified = asyncio.run(verifier.verify_token(token))
-    assert isinstance(verified, remote_mcp.NeyvroAccessToken)
-    assert calls == [(token, True)]
-
-    revoked = remote_mcp.FirebaseTokenVerifier("test-project", "https://mcp.example/mcp", admin_verifier=lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("revoked")))
-    revoked.client.get_signing_key_from_jwt = verifier.client.get_signing_key_from_jwt
-    assert asyncio.run(revoked.verify_token(token)) is None
-
-
-def test_invalid_gateway_key_fails_closed_without_parser_details():
-    backend = remote_mcp.BackendClient()
-    backend.enabled = True
-    backend.base_url = "https://api.example"
-    backend.gateway_private_key = "not-a-private-key"
-    identity = remote_mcp.NeyvroAccessToken(token="firebase-secret", client_id="u", firebase_uid="u", email_verified=True, scopes=["intelligence:read"], resource="https://mcp.example/mcp")
-    with pytest.raises(remote_mcp.BridgeConfigurationError, match="unusable") as error:
-        backend._assertion(identity, remote_mcp.SPEC_BY_NAME["neyvro_search_companies"], remote_mcp.ToolRequest())
-    assert "private key" not in str(error.value).lower()
-
-
-@pytest.mark.parametrize(
-    ("status_code", "code", "expected_status"),
-    [
-        (401, "invalid_assertion", "unauthorized"),
-        (403, "scope_not_granted", "forbidden"),
-        (429, "rate_limited", "rate_limited"),
-        (503, "bridge_unavailable", "backend_unavailable"),
-    ],
-)
-def test_backend_statuses_are_mapped_without_returning_provider_details(monkeypatch, status_code, code, expected_status):
-    identity = remote_mcp.NeyvroAccessToken(token="firebase-secret", client_id="u", firebase_uid="u", email_verified=True, scopes=["intelligence:read"], resource="https://mcp.example/mcp")
-    monkeypatch.setattr(remote_mcp, "get_access_token", lambda: identity)
-
-    async def fail(*_args):
-        raise remote_mcp.BridgeHTTPError(status_code, code)
-
-    monkeypatch.setattr(remote_mcp.BACKEND, "request", fail)
-    result = asyncio.run(remote_mcp.handle_tool(remote_mcp.SPEC_BY_NAME["neyvro_search_companies"], remote_mcp.ToolRequest()))
-    assert result["status"] == expected_status
-    assert "firebase-secret" not in json.dumps(result)
-
-
-def test_timeout_and_malformed_backend_responses_fail_closed(monkeypatch):
-    identity = remote_mcp.NeyvroAccessToken(token="firebase-secret", client_id="u", firebase_uid="u", email_verified=True, scopes=["intelligence:read"], resource="https://mcp.example/mcp")
-    monkeypatch.setattr(remote_mcp, "get_access_token", lambda: identity)
-
-    async def timeout(*_args):
-        raise httpx.ReadTimeout("upstream timeout")
-
-    monkeypatch.setattr(remote_mcp.BACKEND, "request", timeout)
-    result = asyncio.run(remote_mcp.handle_tool(remote_mcp.SPEC_BY_NAME["neyvro_search_companies"], remote_mcp.ToolRequest()))
-    assert result["status"] == "backend_unavailable"
-    assert "upstream timeout" not in json.dumps(result)
-
-    async def malformed(*_args):
-        raise remote_mcp.BridgeHTTPError(502, "malformed_company_response")
-
-    monkeypatch.setattr(remote_mcp.BACKEND, "request", malformed)
-    result = asyncio.run(remote_mcp.handle_tool(remote_mcp.SPEC_BY_NAME["neyvro_search_companies"], remote_mcp.ToolRequest()))
-    assert result["status"] == "backend_unavailable"

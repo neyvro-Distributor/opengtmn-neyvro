@@ -17,7 +17,7 @@ import re
 import sys
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from enum import StrEnum
 from typing import Any, Callable
@@ -74,12 +74,25 @@ class ToolRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
     workspace_id: str | None = Field(default=None, min_length=1, max_length=128)
     company_id: str | None = Field(default=None, min_length=1, max_length=128)
+    conversation_id: str | None = Field(default=None, min_length=1, max_length=128)
     opportunity_id: str | None = Field(default=None, min_length=1, max_length=128)
     buyer_id: str | None = Field(default=None, min_length=1, max_length=128)
     campaign_id: str | None = Field(default=None, min_length=1, max_length=128)
     page: int = Field(default=1, ge=1, le=10000)
     page_size: int = Field(default=25, ge=1, le=MAX_PAGE_SIZE)
-    query: str | None = Field(default=None, max_length=100)
+    query: str | None = Field(default=None, max_length=200)
+    offset: int = Field(default=0, ge=0, le=100000)
+    limit: int | None = Field(default=None, ge=1, le=300)
+    filter: str = Field(default="all")
+    scope: str = Field(default="all")
+    channel: str | None = None
+    days: int = Field(default=7)
+    group: str | None = None
+    cursor: str | None = Field(default=None, max_length=512)
+    lifecycle: str | None = None
+    min_priority: int | None = Field(default=None, ge=0, le=100)
+    assigned_to_me: bool | None = None
+    engagement: str | None = None
     approval_id: str | None = Field(default=None, min_length=1, max_length=256)
     payload: dict[str, Any] = Field(default_factory=dict)
 
@@ -94,6 +107,19 @@ class ToolRequest(BaseModel):
             raise ValueError("workspace_id must be a UUID") from exc
         if value != str(parsed) or value.lower() != value:
             raise ValueError("workspace_id must be a lowercase UUID")
+        return value
+
+    @field_validator("company_id", "opportunity_id", "conversation_id", "buyer_id")
+    @classmethod
+    def _resource_uuid(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        try:
+            parsed = uuid.UUID(value)
+        except ValueError as exc:
+            raise ValueError("resource IDs must be UUIDs") from exc
+        if value != str(parsed) or value.lower() != value:
+            raise ValueError("resource IDs must be lowercase UUIDs")
         return value
 
 
@@ -176,6 +202,59 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
     _spec("neyvro_draft_content", "content", ToolMode.DRAFT, readiness="DISABLED"),
     _spec("neyvro_propose_social_post", "content", ToolMode.PROPOSE, scopes=("intelligence:read", "proposals:write"), approval_required=True, readiness="DISABLED"),
 )
+
+# The AWS contract deliberately has fewer operations than the historical MCP
+# catalog.  Keep the catalog for compatibility, but derive readiness, route,
+# method, scope and operation from this explicit allowlist.  A tool is never
+# callable merely because it has a legacy path in TOOL_SPECS.
+CONTRACT_OPERATIONS: dict[str, dict[str, Any]] = {
+    "companies.search": {"path": "/v1/mcp/companies", "scope": "intelligence:read", "params": ("query", "page", "page_size"), "required": ("workspace_id", "query", "page", "page_size", "total", "companies")},
+    "companies.get": {"path": "/v1/mcp/companies/{company_id}", "scope": "intelligence:read", "params": ("company_id",), "required": ("workspace_id", "company", "story", "outreach", "monitoring", "next_best_action")},
+    "companies.people": {"path": "/v1/mcp/companies/{company_id}/people", "scope": "intelligence:read", "params": ("company_id",), "required": ("workspace_id", "company_id", "company_name", "suppressed", "contacts_checked_at", "company_routes", "people")},
+    "buyers.search": {"path": "/v1/mcp/buyers", "scope": "intelligence:read", "params": ("scope", "channel", "company_id", "query", "offset", "limit"), "required": ("workspace_id", "total", "offset", "limit", "buyers")},
+    "signals.list": {"path": "/v1/mcp/signals", "scope": "intelligence:read", "params": ("days", "group", "scope", "query", "cursor"), "required": ("workspace_id", "window_days", "group", "scope", "query", "total", "previous_total", "companies", "groups", "signals", "next_cursor")},
+    "opportunities.list": {"path": "/v1/mcp/opportunities", "scope": "intelligence:read", "params": ("lifecycle", "min_priority", "assigned_to_me", "engagement"), "required": ("workspace_id", "state", "capacity", "today", "coverage", "brief", "changes", "changes_since", "budget", "policy_note", "generated_at")},
+    "opportunities.get": {"path": "/v1/mcp/opportunities/{opportunity_id}", "scope": "intelligence:read", "params": ("opportunity_id",), "required": ("workspace_id", "summary", "recommendation", "evidence", "investigations", "revisions", "since_review", "engagement", "next_action", "prediction")},
+    "objective.get": {"path": "/v1/mcp/objective", "scope": "intelligence:read", "params": (), "required": ("workspace_id", "brief_version", "brief_changed", "approved", "draft")},
+    "brief.get": {"path": "/v1/mcp/brief", "scope": "intelligence:read", "params": (), "required": ("workspace_id", "onboarding_step", "onboarding_completed_at", "answers_version", "company", "product", "sales", "analysis")},
+    "pipeline.get": {"path": "/v1/mcp/pipeline", "scope": "intelligence:read", "params": (), "required": ("workspace_id", "metrics", "opportunities")},
+    "analytics.get": {"path": "/v1/mcp/analytics", "scope": "intelligence:read", "params": (), "required": ("workspace_id", "operational", "evaluation")},
+    "conversations.list": {"path": "/v1/mcp/conversations", "scope": "mail:read", "params": ("filter", "company_id", "query", "limit"), "required": ("workspace_id", "filter", "counts", "conversations")},
+    "conversations.get": {"path": "/v1/mcp/conversations/{conversation_id}", "scope": "mail:read", "params": ("conversation_id",), "required": ("workspace_id", "conversation", "mailbox", "items")},
+    "mail.overview": {"path": "/v1/mcp/mail/overview", "scope": "mail:read", "params": (), "required": ("workspace_id", "period_days", "mailboxes", "stats")},
+}
+
+TOOL_OPERATION_MAP: dict[str, str] = {
+    "neyvro_search_companies": "companies.search",
+    "neyvro_get_company_twin": "companies.get", "neyvro_get_company_timeline": "companies.get",
+    "neyvro_get_company_signals": "companies.get", "neyvro_get_evidence": "companies.get", "neyvro_get_monitoring_status": "companies.get",
+    "neyvro_list_opportunities": "opportunities.list", "neyvro_explain_opportunity": "opportunities.get", "neyvro_get_opportunity_history": "opportunities.get", "neyvro_get_buying_window": "opportunities.get", "neyvro_get_qualification": "opportunities.get",
+    "neyvro_get_research_questions": "objective.get", "neyvro_get_customer_context": "brief.get", "neyvro_get_icp": "brief.get", "neyvro_get_positioning": "brief.get", "neyvro_get_gtm_strategy": "brief.get",
+    "neyvro_search_buyers": "buyers.search", "neyvro_get_opportunity_buyers": "companies.people", "neyvro_get_buyer": "companies.people", "neyvro_get_contact_verification": "companies.people",
+    "neyvro_get_pipeline": "pipeline.get", "neyvro_list_conversations": "conversations.list", "neyvro_get_conversation": "conversations.get", "neyvro_get_reply_status": "conversations.list", "neyvro_get_followup_queue": "conversations.list",
+    "neyvro_get_connections": "mail.overview", "neyvro_get_capabilities": "mail.overview", "neyvro_get_permissions": "mail.overview", "neyvro_get_sender_status": "mail.overview", "neyvro_get_campaign_metrics": "mail.overview",
+}
+
+def _contract_specs(specs: tuple[ToolSpec, ...]) -> tuple[ToolSpec, ...]:
+    result = []
+    for spec in specs:
+        operation = TOOL_OPERATION_MAP.get(spec.name)
+        contract = CONTRACT_OPERATIONS.get(operation or "")
+        if contract is None:
+            result.append(spec)
+            continue
+        if spec.name == "neyvro_get_conversation":
+            required = ("conversation_id",)
+        elif spec.name == "neyvro_get_buyer":
+            required = ("company_id", "buyer_id")
+        elif operation in {"companies.get", "companies.people"} and spec.name != "neyvro_search_companies":
+            required = ("company_id",)
+        else:
+            required = spec.required_fields
+        result.append(replace(spec, operation=operation, path=contract["path"], method="GET", scopes=(contract["scope"],), required_fields=required, readiness="AVAILABLE"))
+    return tuple(result)
+
+TOOL_SPECS = _contract_specs(TOOL_SPECS)
 SPEC_BY_NAME = {spec.name: spec for spec in TOOL_SPECS}
 
 # This is deliberately derived from the canonical repository once at startup.
@@ -236,6 +315,14 @@ class CompanySearchResponse(BaseModel):
     companies: list[Company]
 
 
+class ContractResponse(BaseModel):
+    """Common contract envelope; operation-specific required fields are checked below."""
+
+    model_config = ConfigDict(extra="allow")
+    workspace_id: str
+    operation: str
+
+
 @dataclass(frozen=True)
 class ToolAdapter:
     """Allowlisted AWS adapter contract for one MCP operation."""
@@ -254,17 +341,27 @@ class ToolAdapter:
     retry_policy: str = "no retries; GET only and one exchange per invocation"
 
 
-ADAPTER_REGISTRY: dict[str, ToolAdapter] = {
-    "neyvro_search_companies": ToolAdapter(
-        tool_name="neyvro_search_companies",
-        operation=BRIDGE_OPERATION,
+OPERATION_ADAPTERS: dict[str, ToolAdapter] = {
+    operation: ToolAdapter(
+        tool_name=operation,
+        operation=operation,
         method="GET",
-        path="/v1/mcp/companies",
-        scope=BRIDGE_PERMISSION,
-        output_model=CompanySearchResponse,
-        side_effects="read-only; transaction is rolled back by AWS",
+        path=contract["path"],
+        scope=contract["scope"],
+        output_model=CompanySearchResponse if operation == "companies.search" else ContractResponse,
+        side_effects="read-only; AWS transaction is rolled back",
         credit_spending=False,
-    ),
+    )
+    for operation, contract in CONTRACT_OPERATIONS.items()
+}
+
+ADAPTER_REGISTRY: dict[str, ToolAdapter] = {
+    tool_name: replace(
+        OPERATION_ADAPTERS[operation],
+        operation=operation,
+        tool_name=tool_name,
+    )
+    for tool_name, operation in TOOL_OPERATION_MAP.items()
 }
 
 
@@ -278,6 +375,7 @@ class BackendClient:
         self.timeout = float(os.getenv("NEYVRO_MCP_BACKEND_TIMEOUT_SECONDS", "10"))
         self.enabled = os.getenv("NEYVRO_MCP_BRIDGE_ENABLED", "false").lower() == "true"
         self.client_name = os.getenv("NEYVRO_MCP_CLIENT_NAME", "neyvro-render")
+        self.allowed_api_hosts = frozenset(host.strip().lower() for host in os.getenv("NEYVRO_MCP_ALLOWED_API_HOSTS", "").split(",") if host.strip())
 
     def _validate_configuration(self) -> None:
         if not self.enabled:
@@ -287,8 +385,11 @@ class BackendClient:
         parsed = urlparse(self.base_url)
         if parsed.username or parsed.password or parsed.fragment or not parsed.hostname:
             raise BridgeConfigurationError("NEYVRO_MCP_API_BASE_URL is invalid")
-        if parsed.scheme != "https" and parsed.hostname not in BRIDGE_LOCAL_HOSTS:
+        host = parsed.hostname.lower()
+        if parsed.scheme != "https" and host not in BRIDGE_LOCAL_HOSTS:
             raise BridgeConfigurationError("NEYVRO_MCP_API_BASE_URL must use HTTPS")
+        if host not in BRIDGE_LOCAL_HOSTS and host not in self.allowed_api_hosts:
+            raise BridgeConfigurationError("NEYVRO_MCP_API_BASE_URL host is not allowlisted")
         if not self.gateway_private_key:
             raise BridgeConfigurationError("NEYVRO_MCP_GATEWAY_PRIVATE_KEY is not configured")
         if self.gateway_kid not in {"gw-1", "gw-test-1"}:
@@ -296,7 +397,8 @@ class BackendClient:
 
     def _assertion(self, identity: NeyvroAccessToken, spec: ToolSpec, request: ToolRequest) -> str:
         self._validate_configuration()
-        if spec.operation != BRIDGE_OPERATION:
+        adapter = ADAPTER_REGISTRY.get(spec.name)
+        if adapter is None or spec.operation != adapter.operation:
             raise BridgeConfigurationError("operation is not enabled")
         now = int(time.time())
         claims: dict[str, Any] = {
@@ -305,7 +407,7 @@ class BackendClient:
             "sub": identity.firebase_uid,
             "email_verified": identity.email_verified,
             "op": spec.operation,
-            "scope": BRIDGE_PERMISSION,
+            "scope": adapter.scope,
             "iat": now,
             "exp": now + 60,
             "jti": str(uuid.uuid4()),
@@ -319,6 +421,27 @@ class BackendClient:
             return jwt.encode(claims, self.gateway_private_key, algorithm="ES256", headers={"alg": "ES256", "typ": "gateway+jwt", "kid": self.gateway_kid})
         except (jwt.PyJWTError, TypeError, ValueError) as exc:
             raise BridgeConfigurationError("gateway signing key is unusable") from exc
+
+    @staticmethod
+    def _validate_request(spec: ToolSpec, request: ToolRequest) -> None:
+        operation = spec.operation or ""
+        if request.query is not None:
+            max_length = 200 if operation == "conversations.list" else 120 if operation == "buyers.search" else 100
+            if len(request.query) > max_length:
+                raise ValueError(f"query must be at most {max_length} characters")
+        if operation == "buyers.search":
+            if request.scope not in {"all", "top", "other"}:
+                raise ValueError("scope must be all, top, or other")
+            if request.limit is None:
+                request.limit = 25
+        if operation == "signals.list":
+            if request.days not in {7, 30, 90} or request.scope not in {"all", "tracked"}:
+                raise ValueError("invalid signals filter")
+        if operation == "conversations.list":
+            if request.filter not in {"all", "replied", "waiting", "scheduled", "problems"}:
+                raise ValueError("invalid conversation filter")
+            if request.limit is None:
+                request.limit = 50
 
     @staticmethod
     def _error_code(response: httpx.Response, default: str) -> tuple[str, list[dict[str, str]]]:
@@ -338,6 +461,7 @@ class BackendClient:
         adapter = ADAPTER_REGISTRY.get(spec.name)
         if adapter is None or adapter.operation != spec.operation or adapter.path != spec.path or adapter.method != spec.method:
             raise BackendDisabled("This Neyvro tool has no supported AWS adapter")
+        self._validate_request(spec, request)
         assertion = self._assertion(identity, spec, request)
         timeout = httpx.Timeout(min(self.timeout, adapter.timeout_seconds))
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
@@ -350,32 +474,51 @@ class BackendClient:
                 access_token = exchanged["access_token"]
                 if exchanged.get("token_type") != "Bearer" or not isinstance(access_token, str) or not access_token:
                     raise ValueError
-                if exchanged.get("operation") != BRIDGE_OPERATION or exchanged.get("expires_in") != 60:
+                if exchanged.get("operation") != adapter.operation or exchanged.get("expires_in") != 60:
                     raise ValueError
                 uuid.UUID(exchanged["exchange_id"])
                 workspace = exchanged["workspace"]
                 workspace_id = workspace["id"]
                 if not isinstance(workspace_id, str) or not isinstance(workspace.get("name"), str):
                     raise ValueError
-                if not isinstance(exchanged.get("scopes"), list) or BRIDGE_PERMISSION not in exchanged["scopes"]:
+                if not isinstance(exchanged.get("scopes"), list) or adapter.scope not in exchanged["scopes"]:
                     raise ValueError
             except (KeyError, TypeError, ValueError):
                 raise BridgeHTTPError(502, "malformed_exchange_response")
-            params = {"page": request.page, "page_size": request.page_size}
-            if request.query is not None:
-                params["query"] = request.query
+            params: dict[str, Any] = {}
+            for name in CONTRACT_OPERATIONS[adapter.operation]["params"]:
+                value = getattr(request, name, None)
+                if spec.name == "neyvro_get_followup_queue" and name == "filter":
+                    value = "waiting"
+                if value is not None and not (name == "query" and value == ""):
+                    params[name] = value
+            path = adapter.path
+            for name in ("company_id", "opportunity_id", "conversation_id"):
+                marker = "{" + name + "}"
+                if marker in path:
+                    value = getattr(request, name, None)
+                    if not value:
+                        raise BridgeHTTPError(422, "missing_argument")
+                    path = path.replace(marker, value)
+                    params.pop(name, None)
             if adapter.method != "GET":
                 raise BridgeConfigurationError("unsupported adapter method")
-            response = await client.get(f"{self.base_url}{adapter.path}", params=params, headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"})
+            response = await client.get(f"{self.base_url}{path}", params=params, headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"})
             if response.status_code != 200:
                 code, workspaces = self._error_code(response, "company_search_failed")
                 raise BridgeHTTPError(response.status_code, code, workspaces)
+            if len(response.content) > MAX_BODY_BYTES:
+                raise BridgeHTTPError(502, "response_too_large")
             try:
-                result = adapter.output_model.model_validate(response.json())
+                raw = response.json()
+                result = adapter.output_model.model_validate(raw)
+                required = CONTRACT_OPERATIONS[adapter.operation]["required"]
+                if any(field not in raw for field in required) or raw.get("operation") not in (None, adapter.operation):
+                    raise ValueError("response does not match the AWS contract")
             except (ValidationError, ValueError, TypeError):
-                raise BridgeHTTPError(502, "malformed_company_response")
-            if result.workspace_id != workspace_id or result.operation != adapter.operation:
-                raise BridgeHTTPError(502, "invalid_company_response")
+                raise BridgeHTTPError(502, "malformed_contract_response")
+            if result.workspace_id != workspace_id:
+                raise BridgeHTTPError(502, "invalid_workspace_response")
             return {"status": "available", "data": result.model_dump(mode="json")}
 
 
@@ -427,6 +570,8 @@ class FirebaseTokenVerifier(JWTVerifier):
         )
 
     async def verify_token(self, token: str) -> AccessToken | None:
+        global _AUTH_VERIFIED
+        _AUTH_VERIFIED = False
         verified = await super().verify_token(token)
         if verified is None:
             return None
@@ -436,7 +581,7 @@ class FirebaseTokenVerifier(JWTVerifier):
             # authentication timestamp on the verified claims.
             claims = jwt.decode(token, options={"verify_signature": False})
             auth_time = claims.get("auth_time")
-            if isinstance(auth_time, bool) or not isinstance(auth_time, (int, float)) or auth_time > time.time() + 5:
+            if auth_time is None or isinstance(auth_time, bool) or not isinstance(auth_time, (int, float)) or auth_time > time.time() + 5:
                 return None
         except (jwt.PyJWTError, TypeError, ValueError):
             return None
@@ -452,6 +597,7 @@ class FirebaseTokenVerifier(JWTVerifier):
                     return None
             except Exception:  # fail closed on Firebase outage or revoked account
                 return None
+        _AUTH_VERIFIED = True
         return verified
 
 
@@ -570,6 +716,22 @@ def _safe_website_url(payload: dict[str, Any]) -> None:
             raise
 
 
+def _project_tool_result(spec: ToolSpec, request: ToolRequest, result: dict[str, Any]) -> dict[str, Any]:
+    """Apply only deterministic, local projections promised by the tool matrix."""
+    if result.get("status") != "available" or not isinstance(result.get("data"), dict):
+        return result
+    data = result["data"]
+    if spec.name == "neyvro_get_buyer":
+        people = data.get("people")
+        if not isinstance(people, list):
+            raise ValueError("companies.people response has no people list")
+        selected = next((person for person in people if isinstance(person, dict) and person.get("id") == request.buyer_id), None)
+        if selected is None:
+            return {"status": "not_found", "error": {"code": "not_found", "message": "The requested record was not found."}}
+        return {"status": "available", "data": {"workspace_id": data.get("workspace_id"), "company_id": data.get("company_id"), "person": selected}}
+    return result
+
+
 async def handle_tool(spec: ToolSpec, request: ToolRequest) -> dict[str, Any]:
     identity, failure = _auth_context(spec, request)
     if failure:
@@ -582,7 +744,7 @@ async def handle_tool(spec: ToolSpec, request: ToolRequest) -> dict[str, Any]:
         _safe_website_url(request.payload)
         if spec.approval_required and not request.approval_id:
             return {"status": "pending_approval", "error": {"code": "approval_required", "message": "The exact customer-approved action ID is required."}}
-        result = await BACKEND.request(spec, request, identity)
+        result = _project_tool_result(spec, request, await BACKEND.request(spec, request, identity))
         LOGGER.info(json.dumps({"event": "mcp_tool", "tool": spec.name, "status": result.get("status")}, sort_keys=True))
         return result
     except BackendDisabled as exc:
@@ -602,13 +764,21 @@ async def handle_tool(spec: ToolSpec, request: ToolRequest) -> dict[str, Any]:
             "user_disabled": "The Neyvro account is disabled.",
             "account_inactive": "The Neyvro workspace is inactive.",
             "rate_limited": "Neyvro rate limit reached; retry after the supplied delay.",
+            "not_found": "The requested record was not found.",
+            "not_ready": "This Neyvro workspace is not ready for that read.",
+            "bridge_unavailable": "The Neyvro tools are unavailable.",
+            "response_too_large": "The Neyvro backend returned an oversized response.",
         }
         if exc.status_code in {401, 403}:
             status = "unauthorized" if exc.status_code == 401 else "forbidden"
         elif exc.status_code == 429:
             status = "rate_limited"
+        elif exc.status_code == 404:
+            status = "not_found"
         elif exc.status_code == 422:
             status = "invalid_request"
+        elif exc.status_code == 503 and exc.code == "bridge_unavailable":
+            status = "disabled"
         else:
             status = "backend_unavailable"
         return {"status": status, "error": {"code": exc.code, "message": messages.get(exc.code, "The Neyvro backend did not authorize this request.")}}
@@ -729,7 +899,8 @@ def build_server() -> FastMCP:
     for spec in TOOL_SPECS:
         if spec.name not in ENABLED_PRIVATE_TOOLS:
             continue
-        server.add_tool(_tool_handler(spec), name=spec.name, description=spec.description, structured_output=True, meta={"readiness": spec.readiness, "mode": spec.mode.value, "required_scopes": list(spec.scopes), "approval_required": spec.approval_required, "backend_path": spec.path})
+        adapter = ADAPTER_REGISTRY[spec.name]
+        server.add_tool(_tool_handler(spec), name=spec.name, description=spec.description, structured_output=True, meta={"readiness": spec.readiness, "mode": spec.mode.value, "required_scopes": list(spec.scopes), "approval_required": spec.approval_required, "backend_path": spec.path, "x_mcp_operation": adapter.operation, "x_mcp_scope": adapter.scope, "x_mcp_read_only": True, "x_mcp_spends_credits": False})
     # These two tools intentionally do not call _auth_context and do not have
     # backend paths. They expose only the canonical public skill library.
     server.add_tool(_public_list_skills, name="neyvro_list_skills", description="List bounded metadata for the public Neyvro skill library.", structured_output=True, meta={"readiness": "AVAILABLE", "mode": "KNOWLEDGE", "auth": "PUBLIC", "read_only": True})
