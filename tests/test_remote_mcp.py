@@ -35,7 +35,8 @@ def test_public_tools_are_separate_from_the_56_backend_specs():
     assert tools["neyvro_get_skill"].meta["read_only"] is True
 
 
-def test_unconfigured_readiness_is_not_verified():
+def test_unconfigured_readiness_is_not_verified(monkeypatch):
+    monkeypatch.setattr(remote_mcp, "_AUTH_VERIFIED", False)
     report = remote_mcp.readiness_report()
 
     assert report["authentication"] == "BLOCKED"

@@ -1,9 +1,10 @@
 import asyncio
 import uuid
+import time
 
 import jwt
 import pytest
-from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.hazmat.primitives import serialization
 
 from neyvro import remote_mcp as mcp
@@ -66,3 +67,38 @@ def test_invalid_contract_inputs_are_rejected():
 def test_response_envelope_requires_workspace_and_operation():
     with pytest.raises(Exception):
         mcp.ContractResponse.model_validate({"workspace_id": str(uuid.uuid4())})
+
+
+def test_buyer_projection_cannot_return_another_person():
+    spec = mcp.SPEC_BY_NAME["neyvro_get_buyer"]
+    request = mcp.ToolRequest(company_id="00000000-0000-0000-0000-000000000001", buyer_id="00000000-0000-0000-0000-000000000002")
+    raw = {"workspace_id": "00000000-0000-0000-0000-000000000003", "people": [{"id": request.buyer_id, "name": "Synthetic Buyer"}, {"id": "other", "name": "Other"}]}
+    projected = mcp._project_tool_result(spec, request, {"status": "available", "data": raw})
+    assert projected["data"]["person"]["id"] == request.buyer_id
+    assert "Other" not in str(projected)
+
+
+def test_firebase_verifier_requires_parent_signature_and_auth_time():
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    verifier = mcp.FirebaseTokenVerifier("test-project", "https://mcp.example/mcp")
+    verifier.client.get_signing_key_from_jwt = lambda _token: type("Key", (), {"key": key.public_key()})()
+    base = {"iss": "https://securetoken.google.com/test-project", "aud": "test-project", "sub": "uid-1", "iat": int(time.time()), "exp": int(time.time()) + 300, "email_verified": True}
+    missing_auth_time = jwt.encode(base, key, algorithm="RS256")
+    assert asyncio.run(verifier.verify_token(missing_auth_time)) is None
+
+
+def test_each_of_the_thirty_enabled_tools_passes_its_gateway_boundary(monkeypatch):
+    identity = mcp.NeyvroAccessToken(token="opaque", client_id="uid", firebase_uid="uid", email_verified=True, scopes=["intelligence:read", "mail:read"], resource="https://mcp.example/mcp")
+    monkeypatch.setattr(mcp, "get_access_token", lambda: identity)
+    calls = []
+
+    async def fake_request(spec, request, token):
+        calls.append((spec.name, spec.operation, spec.scopes, request))
+        return {"status": "available", "data": {"workspace_id": "00000000-0000-0000-0000-000000000003", "operation": spec.operation, "people": [{"id": request.buyer_id}]}}
+
+    monkeypatch.setattr(mcp.BACKEND, "request", fake_request)
+    request = mcp.ToolRequest(workspace_id="00000000-0000-0000-0000-000000000003", company_id="00000000-0000-0000-0000-000000000001", buyer_id="00000000-0000-0000-0000-000000000002", opportunity_id="00000000-0000-0000-0000-000000000004", conversation_id="00000000-0000-0000-0000-000000000005")
+    results = {name: asyncio.run(mcp.handle_tool(mcp.SPEC_BY_NAME[name], request)) for name in sorted(mcp.ENABLED_PRIVATE_TOOLS)}
+    assert set(results) == mcp.ENABLED_PRIVATE_TOOLS
+    assert all(result["status"] == "available" for result in results.values())
+    assert len(calls) == 30

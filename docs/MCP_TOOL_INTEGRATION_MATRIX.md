@@ -26,3 +26,7 @@ fourteen read-only operations:
 Corrections: conversation lookup uses `conversation_id`; follow-up queue forces
 `filter=waiting`; permissions expose only the caller's access; mailbox tools
 use `mail:read`. The other 26 private tools stay disabled.
+
+Disabled breakdown: 6 pending write/research contracts, 7 with no backend, 1
+unsafe ICP evaluation, and 12 prohibited/provider-unavailable tools. No
+disabled tool is registered in the callable private MCP server.

@@ -243,7 +243,14 @@ def _contract_specs(specs: tuple[ToolSpec, ...]) -> tuple[ToolSpec, ...]:
         if contract is None:
             result.append(spec)
             continue
-        required = ("conversation_id",) if spec.name == "neyvro_get_conversation" else (("company_id",) if operation in {"companies.get", "companies.people"} and spec.name != "neyvro_search_companies" else spec.required_fields)
+        if spec.name == "neyvro_get_conversation":
+            required = ("conversation_id",)
+        elif spec.name == "neyvro_get_buyer":
+            required = ("company_id", "buyer_id")
+        elif operation in {"companies.get", "companies.people"} and spec.name != "neyvro_search_companies":
+            required = ("company_id",)
+        else:
+            required = spec.required_fields
         result.append(replace(spec, operation=operation, path=contract["path"], method="GET", scopes=(contract["scope"],), required_fields=required, readiness="AVAILABLE"))
     return tuple(result)
 
@@ -500,6 +507,8 @@ class BackendClient:
             if response.status_code != 200:
                 code, workspaces = self._error_code(response, "company_search_failed")
                 raise BridgeHTTPError(response.status_code, code, workspaces)
+            if len(response.content) > MAX_BODY_BYTES:
+                raise BridgeHTTPError(502, "response_too_large")
             try:
                 raw = response.json()
                 result = adapter.output_model.model_validate(raw)
@@ -561,6 +570,9 @@ class FirebaseTokenVerifier(JWTVerifier):
         )
 
     async def verify_token(self, token: str) -> AccessToken | None:
+        global _AUTH_VERIFIED
+        _AUTH_VERIFIED = False
+        verified = await super().verify_token(token)
         if verified is None:
             return None
         try:
@@ -569,7 +581,7 @@ class FirebaseTokenVerifier(JWTVerifier):
             # authentication timestamp on the verified claims.
             claims = jwt.decode(token, options={"verify_signature": False})
             auth_time = claims.get("auth_time")
-            if isinstance(auth_time, bool) or not isinstance(auth_time, (int, float)) or auth_time > time.time() + 5:
+            if auth_time is None or isinstance(auth_time, bool) or not isinstance(auth_time, (int, float)) or auth_time > time.time() + 5:
                 return None
         except (jwt.PyJWTError, TypeError, ValueError):
             return None
@@ -585,6 +597,7 @@ class FirebaseTokenVerifier(JWTVerifier):
                     return None
             except Exception:  # fail closed on Firebase outage or revoked account
                 return None
+        _AUTH_VERIFIED = True
         return verified
 
 
@@ -703,6 +716,22 @@ def _safe_website_url(payload: dict[str, Any]) -> None:
             raise
 
 
+def _project_tool_result(spec: ToolSpec, request: ToolRequest, result: dict[str, Any]) -> dict[str, Any]:
+    """Apply only deterministic, local projections promised by the tool matrix."""
+    if result.get("status") != "available" or not isinstance(result.get("data"), dict):
+        return result
+    data = result["data"]
+    if spec.name == "neyvro_get_buyer":
+        people = data.get("people")
+        if not isinstance(people, list):
+            raise ValueError("companies.people response has no people list")
+        selected = next((person for person in people if isinstance(person, dict) and person.get("id") == request.buyer_id), None)
+        if selected is None:
+            return {"status": "not_found", "error": {"code": "not_found", "message": "The requested record was not found."}}
+        return {"status": "available", "data": {"workspace_id": data.get("workspace_id"), "company_id": data.get("company_id"), "person": selected}}
+    return result
+
+
 async def handle_tool(spec: ToolSpec, request: ToolRequest) -> dict[str, Any]:
     identity, failure = _auth_context(spec, request)
     if failure:
@@ -715,7 +744,7 @@ async def handle_tool(spec: ToolSpec, request: ToolRequest) -> dict[str, Any]:
         _safe_website_url(request.payload)
         if spec.approval_required and not request.approval_id:
             return {"status": "pending_approval", "error": {"code": "approval_required", "message": "The exact customer-approved action ID is required."}}
-        result = await BACKEND.request(spec, request, identity)
+        result = _project_tool_result(spec, request, await BACKEND.request(spec, request, identity))
         LOGGER.info(json.dumps({"event": "mcp_tool", "tool": spec.name, "status": result.get("status")}, sort_keys=True))
         return result
     except BackendDisabled as exc:
@@ -735,13 +764,21 @@ async def handle_tool(spec: ToolSpec, request: ToolRequest) -> dict[str, Any]:
             "user_disabled": "The Neyvro account is disabled.",
             "account_inactive": "The Neyvro workspace is inactive.",
             "rate_limited": "Neyvro rate limit reached; retry after the supplied delay.",
+            "not_found": "The requested record was not found.",
+            "not_ready": "This Neyvro workspace is not ready for that read.",
+            "bridge_unavailable": "The Neyvro tools are unavailable.",
+            "response_too_large": "The Neyvro backend returned an oversized response.",
         }
         if exc.status_code in {401, 403}:
             status = "unauthorized" if exc.status_code == 401 else "forbidden"
         elif exc.status_code == 429:
             status = "rate_limited"
+        elif exc.status_code == 404:
+            status = "not_found"
         elif exc.status_code == 422:
             status = "invalid_request"
+        elif exc.status_code == 503 and exc.code == "bridge_unavailable":
+            status = "disabled"
         else:
             status = "backend_unavailable"
         return {"status": status, "error": {"code": exc.code, "message": messages.get(exc.code, "The Neyvro backend did not authorize this request.")}}
