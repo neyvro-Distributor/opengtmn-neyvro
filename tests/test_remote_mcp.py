@@ -108,7 +108,7 @@ def test_jwt_verifier_rejects_missing_or_blank_subject():
         assert asyncio.run(verifier.verify_token(token)) is None
 
 
-def test_missing_workspace_is_verified_but_not_private_authorization():
+def test_unlinked_external_identity_is_verified_but_not_private_authorization():
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     verifier = remote_mcp.JWTVerifier("https://issuer.example", "neyvro-mcp", "https://issuer.example/jwks", "https://mcp.example/mcp")
     verifier.client.get_signing_key_from_jwt = lambda _token: type("Key", (), {"key": private_key.public_key()})()
@@ -124,7 +124,8 @@ def test_missing_workspace_is_verified_but_not_private_authorization():
         result = asyncio.run(remote_mcp.handle_tool(read_spec, remote_mcp.ToolRequest(company_id="00000000-0000-0000-0000-000000000003")))
     finally:
         remote_mcp.get_access_token = remote_mcp_get_access_token
-    assert result["status"] == "disabled"
+    assert result["status"] == "unauthorized"
+    assert result["error"]["code"] == "identity_binding_required"
 
 
 def test_jwks_rotation_uses_the_current_signing_key():
