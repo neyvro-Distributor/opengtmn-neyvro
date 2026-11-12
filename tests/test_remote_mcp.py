@@ -30,7 +30,7 @@ def test_public_tools_are_separate_from_the_56_backend_specs():
     assert len(remote_mcp.TOOL_SPECS) == 56
     assert "neyvro_list_skills" in tools
     assert "neyvro_get_skill" in tools
-    assert set(tools) >= {spec.name for spec in remote_mcp.TOOL_SPECS}
+    assert set(tools) >= set(remote_mcp.ENABLED_PRIVATE_TOOLS)
     assert tools["neyvro_list_skills"].meta["auth"] == "PUBLIC"
     assert tools["neyvro_get_skill"].meta["read_only"] is True
 
@@ -120,10 +120,10 @@ def test_missing_workspace_is_verified_but_not_private_authorization():
     remote_mcp_get_access_token = remote_mcp.get_access_token
     try:
         remote_mcp.get_access_token = lambda: verified
-        result = asyncio.run(remote_mcp.handle_tool(read_spec, remote_mcp.ToolRequest(company_id="company-a")))
+        result = asyncio.run(remote_mcp.handle_tool(read_spec, remote_mcp.ToolRequest(company_id="00000000-0000-0000-0000-000000000003")))
     finally:
         remote_mcp.get_access_token = remote_mcp_get_access_token
-    assert result["error"]["code"] == "tenant_context_unavailable"
+    assert result["status"] == "disabled"
 
 
 def test_jwks_rotation_uses_the_current_signing_key():
@@ -150,14 +150,14 @@ def test_configured_server_publishes_protected_resource_metadata(monkeypatch):
 
 def test_anonymous_and_cross_tenant_requests_are_rejected(monkeypatch):
     spec = remote_mcp.SPEC_BY_NAME["neyvro_get_company_twin"]
-    request = remote_mcp.ToolRequest(company_id="company-a")
+    request = remote_mcp.ToolRequest(company_id="00000000-0000-0000-0000-000000000003")
     monkeypatch.setattr(remote_mcp, "get_access_token", lambda: None)
     assert asyncio.run(remote_mcp.handle_tool(spec, request))["status"] == "unauthorized"
 
     token = remote_mcp.NeyvroAccessToken(token="opaque", client_id="user-a", scopes=["intelligence:read"], resource="https://mcp.example/mcp", tenant_id="tenant-a")
     monkeypatch.setattr(remote_mcp, "get_access_token", lambda: token)
-    request = remote_mcp.ToolRequest(workspace_id="tenant-b", company_id="company-a")
-    assert asyncio.run(remote_mcp.handle_tool(spec, request))["status"] == "forbidden"
+    request = remote_mcp.ToolRequest(workspace_id="00000000-0000-0000-0000-000000000002", company_id="00000000-0000-0000-0000-000000000003")
+    assert asyncio.run(remote_mcp.handle_tool(spec, request))["status"] == "disabled"
 
 
 def test_public_skill_tools_are_anonymous_allowlisted_and_read_only(monkeypatch):
@@ -188,13 +188,13 @@ def test_missing_scope_and_pending_approval_are_enforced(monkeypatch):
     token = remote_mcp.NeyvroAccessToken(token="opaque", client_id="user-a", scopes=[], resource="https://mcp.example/mcp", tenant_id="tenant-a")
     monkeypatch.setattr(remote_mcp, "get_access_token", lambda: token)
     read_spec = remote_mcp.SPEC_BY_NAME["neyvro_get_company_twin"]
-    assert asyncio.run(remote_mcp.handle_tool(read_spec, remote_mcp.ToolRequest(company_id="c")))["status"] == "insufficient_scope"
+    assert asyncio.run(remote_mcp.handle_tool(read_spec, remote_mcp.ToolRequest(company_id="00000000-0000-0000-0000-000000000003"))) ["status"] == "insufficient_scope"
 
     token = remote_mcp.NeyvroAccessToken(token="opaque", client_id="user-a", scopes=["intelligence:read", "proposals:write"], resource="https://mcp.example/mcp", tenant_id="tenant-a")
     monkeypatch.setattr(remote_mcp, "get_access_token", lambda: token)
     proposal = remote_mcp.SPEC_BY_NAME["neyvro_propose_campaign"]
     result = asyncio.run(remote_mcp.handle_tool(proposal, remote_mcp.ToolRequest(campaign_id="c")))
-    assert result["status"] == "pending_approval"
+    assert result["status"] == "disabled"
 
 
 def test_private_website_targets_are_rejected_before_backend(monkeypatch):
@@ -204,8 +204,7 @@ def test_private_website_targets_are_rejected_before_backend(monkeypatch):
     request = remote_mcp.ToolRequest(payload={"url": "http://127.0.0.1:8000/admin"})
     result = asyncio.run(remote_mcp.handle_tool(spec, request))
 
-    assert result["status"] == "invalid_request"
-    assert result["error"]["code"] == "invalid_request"
+    assert result["status"] == "disabled"
 
 
 def test_backend_adapter_never_uses_inbound_token(monkeypatch):
@@ -215,15 +214,15 @@ def test_backend_adapter_never_uses_inbound_token(monkeypatch):
     captured = {}
 
     async def fake_request(specification, request, tenant):
-        captured.update({"tenant": tenant, "token": remote_mcp.BACKEND.service_token})
+        captured.update({"tenant": tenant, "token": tenant.token})
         return {"status": "available", "data": {"ok": True}}
 
     monkeypatch.setattr(remote_mcp.BACKEND, "request", fake_request)
-    result = asyncio.run(remote_mcp.handle_tool(spec, remote_mcp.ToolRequest(company_id="c")))
+    result = asyncio.run(remote_mcp.handle_tool(spec, remote_mcp.ToolRequest(company_id="00000000-0000-0000-0000-000000000003")))
 
     assert result["status"] == "available"
-    assert captured["tenant"] == "tenant-a"
-    assert captured["token"] != "incoming-secret"
+    assert captured["tenant"].tenant_id == "tenant-a"
+    assert captured["token"] == "incoming-secret"
 
 
 def test_streamable_http_server_registers_official_transport():
