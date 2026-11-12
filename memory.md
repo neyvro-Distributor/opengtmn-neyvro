@@ -252,6 +252,13 @@ This file records the work implemented in this repository so the project history
 - Verification: deployment `dep-dbd6p43bc2fs73a1eug0` is `live`; `https://opengtmn-neyvro.onrender.com/health` returned HTTP 200; external MCP initialize, `tools/list` (56), `resources/list`/read (35), `prompts/list` (35), and safe unauthenticated tool rejection passed. Codex registration succeeded.
 - Notes: OAuth is still unsupported and backend adapter remains disabled, so private customer-data tools are not enabled. Codex and ChatGPT authenticated customer workflows remain unverified.
 
+### 2026-11-11 — AWS bridge contract (docs only)
+
+- Implemented: added `docs/AWS_BRIDGE_CONTRACT.md`, the contract the Render MCP adapter must follow to call the NEYVRO API: Token A (Firebase, stays at Render), Token B (gateway assertion, ES256, 60 s, single use) exchanged at `POST /v1/integrations/mcp/exchange` for Token C (60 s, one person, one workspace, one operation), and the first operation `companies.search` at `GET /v1/mcp/companies`. Also covers every field, error codes, what Render must do, the permission policy, keys and rotation.
+- Files: `docs/AWS_BRIDGE_CONTRACT.md`, `memory.md`.
+- Verification: docs only, no code or configuration changed. The AWS side it describes was built in the neyvro repository (branch `mcp-bridge`, commit `1668dea`): full API suite 1,485 passed, 50 bridge security tests, 31 of 31 live HTTP checks against a local copy.
+- Notes: the AWS side is **not deployed**, so the live Render service keeps its backend adapter disabled. Next on this side: build the adapter to contract section 8 (Firebase revocation check, a fresh Token B and C per tool call, MCP OAuth with PKCE for external clients, pinned MCP SDK, `neyvro_search_companies` → `GET /v1/mcp/companies`).
+
 ## Future entries
 
 When implementing new work, add an entry using this format:

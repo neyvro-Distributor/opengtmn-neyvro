@@ -8,6 +8,20 @@ services:
     envVars:
       - key: NEYVRO_MCP_ENABLE_EXECUTION
         value: "false"
+      - key: NEYVRO_MCP_BRIDGE_ENABLED
+        value: "false"
+      - key: NEYVRO_MCP_FIREBASE_PROJECT_ID
+        sync: false
+      - key: NEYVRO_MCP_FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: NEYVRO_MCP_GATEWAY_PRIVATE_KEY
+        sync: false
+      - key: NEYVRO_MCP_GATEWAY_KEY_ID
+        value: "gw-1"
+      - key: NEYVRO_MCP_API_BASE_URL
+        sync: false
+      - key: NEYVRO_MCP_CLIENT_NAME
+        value: "render"
       - key: NEYVRO_MCP_OAUTH_ISSUER
         sync: false
       - key: NEYVRO_MCP_OAUTH_AUDIENCE
@@ -17,10 +31,6 @@ services:
       - key: NEYVRO_MCP_RESOURCE_URL
         sync: false
       - key: NEYVRO_MCP_ALLOWED_HOSTS
-        sync: false
-      - key: NEYVRO_MCP_BACKEND_URL
-        sync: false
-      - key: NEYVRO_MCP_BACKEND_SERVICE_TOKEN
         sync: false
       - key: NEYVRO_MCP_REQUESTS_PER_MINUTE
         value: "60"
