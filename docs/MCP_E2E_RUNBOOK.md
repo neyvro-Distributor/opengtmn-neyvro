@@ -18,5 +18,10 @@
 9. Stop local processes and remove only the isolated test database/data volume.
 
 The runner exits `2` for blocked or failed verification and `0` only when every
-tool call returns successfully. Synthetic handler tests must never be reported
-as real cross-service E2E.
+tool call is `PASS_POSITIVE`. A missing resource fixture is reported as
+`BLOCKED_MISSING_FIXTURE`; do not replace it with a guessed UUID. Synthetic
+handler tests must never be reported as real cross-service E2E.
+
+For negative checks, invoke the classifier with an explicit expected-denial
+scenario. `PASS_EXPECTED_DENIAL` is a security-test pass, not a business-data
+pass. Keep those results in a separate report section.

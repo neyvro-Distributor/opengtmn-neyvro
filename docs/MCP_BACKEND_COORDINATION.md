@@ -12,3 +12,9 @@ be synthetic and end in `_mcp_dev`; production RDS is prohibited. The AWS
 developer should also provide the reported 60/60 MCP test and 89/89 local HTTP
 check evidence, plus database fingerprint evidence showing only audit,
 replay and rate-limit bookkeeping changed.
+# Runner coordination update
+
+The gateway runner requires the AWS developer's actual local API and seeded
+synthetic records. It discovers IDs from authorized responses and reports
+`BLOCKED_MISSING_FIXTURE` if required records are absent. Do not provide
+guessed UUIDs or silently reseed production/shared data.
