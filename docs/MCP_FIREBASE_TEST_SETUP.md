@@ -24,6 +24,29 @@ manual: the repository does not create cloud projects or retrieve credentials.
 8. Verify Firebase Admin revocation/disabled-user checks on the gateway before
    running positive calls.
 
+## Safe Token A acquisition
+
+The repository helper `scripts/firebase_test_token.py` uses the official
+Firebase Identity Toolkit Email/Password endpoint for the dedicated test
+project. It reads `FIREBASE_WEB_API_KEY`,
+`NEYVRO_FIREBASE_TEST_EMAIL`, and `NEYVRO_FIREBASE_TEST_PASSWORD` only from
+the process environment:
+
+```bash
+set -a
+source .env
+set +a
+export NEYVRO_FIREBASE_TEST_EMAIL='alpha-test-user@example.test'
+export NEYVRO_FIREBASE_TEST_PASSWORD='provided-out-of-band'
+PYTHONPATH=src python3 scripts/firebase_test_token.py
+```
+
+The command prints only safe metadata (project, UID, verification state, and
+expiry). The token remains in the helper process and is never emitted or
+written to a report. The helper performs project, issuer, audience, subject,
+expiry, and verified-email checks; Firebase Admin SDK on the gateway remains
+the authority for signature and revocation validation.
+
 If any item is unavailable, report `REAL_E2E=BLOCKED`. A fabricated JWT,
 ordinary ungranted Firebase token, or mocked handler result is not evidence of
 genuine identity or AWS authorization.
