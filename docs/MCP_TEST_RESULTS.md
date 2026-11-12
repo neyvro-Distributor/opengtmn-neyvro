@@ -5,7 +5,11 @@ operation/scope/route mappings, disabled tools, JWT verification, fresh
 assertion boundaries, input validation, workspace selection, backend error
 mapping, response-envelope validation and public skill regressions.
 
-Current local result: `167 passed, 0 failed` with `PYTHONPATH=src pytest -q`.
+Current local result: `169 passed, 0 failed` with `PYTHONPATH=src pytest -q`.
+
+The two new tests cover the loopback-only real E2E runner and blocked local
+stack reporting. The runner itself returns `BLOCKED` when the gateway,
+backend, database or real test identity is unavailable.
 
 The 167 are mocked/unit tests only. The AWS contract suite was attempted with
 `NEYVRO_DATABASE_URL=postgresql://...@127.0.0.1:5440/neyvro_mcp_dev` and
